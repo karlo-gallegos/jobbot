@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Daily deadline reminders (no AI). Reads tracker.md and pings ntfy 3 days, 1 day
-and on the day before each closing date in the 'Apply now' and 'Possibly open' tables.
+"""Daily deadline reminders (no AI). Reads watchlist.json and pings ntfy 3 days, 1 day
+and on the day of each closing date for roles not yet submitted (found / shortlisted /
+pack_ready; the junior watch list is excluded).
 Cron: 13 8 * * * /usr/bin/python3 /opt/jobbot/reminders.py >> /opt/jobbot/logs/reminders.log 2>&1"""
-import datetime, pathlib, re, urllib.request
+import datetime, pathlib, urllib.request
+import watchlist
 
 ROOT = pathlib.Path(__file__).resolve().parent
 ALERT_DAYS = {3: "in 3 days", 1: "TOMORROW", 0: "TODAY"}
-MONTHS = {m: i for i, m in enumerate(
-    ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"], 1)}
 
 
 def topic():
@@ -17,44 +17,26 @@ def topic():
     raise SystemExit("NTFY_TOPIC missing in config.env")
 
 
-def parse_date(text):
-    m = re.search(r"(20\d\d)-(\d\d)-(\d\d)", text)
-    if m:
-        return datetime.date(*map(int, m.groups()))
-    m = re.search(r"(\d{1,2})\s+([A-Za-z]{3})[a-z]*\.?\s+(20\d\d)", text)
-    if m and m.group(2).lower() in MONTHS:
-        return datetime.date(int(m.group(3)), MONTHS[m.group(2).lower()], int(m.group(1)))
-    return None
-
-
-def open_roles():
-    """Yield (employer, role, closing_date) from the Apply now / Possibly open tables."""
-    section, header = None, None
-    for line in (ROOT / "tracker.md").read_text().splitlines():
-        if line.startswith("## "):
-            low = line.lower()
-            section = "open" if ("apply now" in low or "possibly open" in low) else None
-            header = None
+def open_roles(wl):
+    """Yield (employer, role, closing_date, closing_time-or-None) for roles still to apply for."""
+    for r in wl["roles"]:
+        if r["status"] not in watchlist.OPEN or r.get("kind") == "junior_watch" or not r.get("closing_date"):
             continue
-        if section != "open" or not line.startswith("|") or set(line) <= set("|- "):
+        try:
+            close, at = watchlist.parse_closing(r["closing_date"])
+        except ValueError:
             continue
-        cells = [c.strip() for c in line.strip("|").split("|")]
-        if header is None:
-            header = [c.lower() for c in cells]
-            continue
-        row = dict(zip(header, cells))
-        close = next((parse_date(v) for k, v in row.items() if k.startswith("clos") and not v.lower().startswith(("not stated", "rolling", "unknown"))), None)
-        if close:
-            yield row.get("employer", "?"), row.get("role", ""), close
+        yield r["employer"], r["role"], close, at
 
 
 def main():
     today = datetime.date.today()
     alerts = []
-    for employer, role, close in open_roles():
+    for employer, role, close, at in open_roles(watchlist.load(today)):
         days = (close - today).days
         if days in ALERT_DAYS:
-            alerts.append(f"{employer} closes {ALERT_DAYS[days]} ({close:%a %d %b}) – {role}")
+            when = f"{close:%a %d %b}" + (f" {at:%H:%M}" if at else "")
+            alerts.append(f"{employer} closes {ALERT_DAYS[days]} ({when}) – {role}")
     if not alerts:
         print(f"{today}: no deadlines due")
         return

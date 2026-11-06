@@ -10,13 +10,20 @@ LOG="logs/run-$TODAY.log"
 notify() { curl -fsS -H "Title: Jobbot" -d "$1" "https://ntfy.sh/$NTFY_TOPIC" >/dev/null || true; }
 trap 'notify "Jobbot run failed on $TODAY – see $LOG"' ERR
 
+# tracker.md is generated from watchlist.json (first run imports the old tracker.md)
+python3 watchlist.py render >> "$LOG" 2>&1
+
 echo "== $(date) scan ($SCAN_MODEL)" >> "$LOG"
 echo "[]" > new_roles.json
+echo "[]" > scan_results.json
 claude -p "$(cat prompts/scan.md)" \
   --model "$SCAN_MODEL" --max-turns 60 \
   --permission-mode acceptEdits \
   --allowedTools "Read" "Edit" "Write" "WebSearch" "WebFetch" "Bash(echo:*)" "Bash(date:*)" \
   >> "$LOG" 2>&1
+
+echo "== $(date) merge into watchlist" >> "$LOG"
+python3 watchlist.py merge >> "$LOG" 2>&1
 
 if [ "$(python3 -c 'import json;print(len([r for r in json.load(open("new_roles.json")) if not r.get("own_words_only")]))')" -gt 0 ]; then
   echo "== $(date) tailor ($TAILOR_MODEL)" >> "$LOG"

@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
-"""Turn new_roles.json into tailored CV/cover-letter .docx files and one .ics file.
+"""Turn new_roles.json into tailored CV/cover-letter .docx files and one .ics file,
+then mark those roles pack_ready in watchlist.json and rewrite tracker.md.
 No AI here: it only copies the base documents and swaps in text the tailor step wrote."""
 import json, re, sys, datetime, pathlib
 import docx
+import watchlist
+from watchlist import parse_closing
 
 ROOT = pathlib.Path(__file__).resolve().parent
 BASE, OUT = ROOT / "base", ROOT / "out"
@@ -65,15 +68,6 @@ def build_letter(role):
     return out
 
 
-def parse_closing(value):
-    """Return (date, time-or-None) for "YYYY-MM-DD" or "YYYY-MM-DDTHH:MM[:SS]".
-    Raises ValueError if the first 10 characters are not a date."""
-    close = datetime.date.fromisoformat(value[:10])
-    m = re.match(r"[T ](\d{1,2}):(\d{2})", value[10:])
-    at = datetime.time(int(m.group(1)), int(m.group(2))) if m else None
-    return close, at
-
-
 def build_ics(roles, today):
     def ev(uid, s, summary, desc):
         e = s + datetime.timedelta(hours=1)  # one-hour event starting at s
@@ -117,13 +111,17 @@ def main():
     today = datetime.date.today()
     roles = json.loads((ROOT / "new_roles.json").read_text() or "[]")
     made = []
+    wl = watchlist.load(today)
     for r in roles:
         if r.get("own_words_only"):
+            watchlist.record_pack(wl, r, [], today)
             continue
+        first = len(made)
         if r.get("profile") or r.get("profile_sentence"):
             made.append(build_cv(r))
         if r.get("cover_letter"):
             made.append(build_letter(r))
+        watchlist.record_pack(wl, r, [m.name for m in made[first:]], today)
         if r.get("jd_notes"):
             notes = OUT / f"Role_Notes_{r['slug']}.md"
             gaps = r.get("match_gaps") or []
@@ -132,6 +130,8 @@ def main():
                 "## What the listing asks for\n" + "\n".join(f"- {b}" for b in r["jd_notes"]) +
                 ("\n\n## Gaps to address yourself\n" + "\n".join(f"- {g}" for g in gaps) if gaps else "") + "\n")
             made.append(notes)
+    watchlist.save(wl)
+    watchlist.render(wl, today)
     ics = build_ics(roles, today)
     if ics:
         made.append(ics)

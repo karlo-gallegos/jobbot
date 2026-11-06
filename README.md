@@ -2,7 +2,7 @@
 
 Every Sunday at 18:31 it:
 1. reads `inbox.md` (your updates) and updates `tracker.md`
-2. searches gradireland, Gradcracker NI, TargetJobs/Prospects and Bright Network for new 2027 tech grad roles on the island of Ireland and re-checks existing ones (**Haiku**)
+2. searches gradireland, Gradcracker NI, TargetJobs/Prospects and Bright Network for new 2027 tech grad roles on the island of Ireland and re-checks existing ones (**Haiku**); `watchlist.py` merges the results into `watchlist.json` by URL and regenerates `tracker.md`
 3. writes a Profile sentence and, where required, a cover letter for up to 3 new roles (**Sonnet**)
 4. builds tailored `.docx` CVs/letters from your own base documents and a `.ics` of deadlines (plain Python, no AI)
 5. sends a summary to your phone via ntfy
@@ -55,6 +55,13 @@ skip Version 1
 The tarball install above is superseded: change code in the repo, then on head01
 `cd /opt/jobbot && git pull --ff-only` (or run `ansible/deploy.yml`). Don't hand-edit tracked files.
 
-Git holds code only. `config.env`, `base/`, `facts.md`, `new_roles*.json`, `tracker.md`,
+## The role list
+`watchlist.json` is the one persistent list (statuses `found → shortlisted → pack_ready →
+submitted → outcome`, schema at the top of `watchlist.py`). `tracker.md` is generated from it –
+don't edit it by hand. `reminders.py` reads `watchlist.json`. The first run after this change
+imports the old hand-kept `tracker.md` and keeps a copy as `tracker-pre-watchlist.md`;
+check the generated `tracker.md` against it once. Rebuild by hand: `python3 watchlist.py render`.
+
+Git holds code only. `config.env`, `base/`, `facts.md`, `new_roles*.json`, `watchlist.json`, `scan_results.json`, `tracker.md`,
 `inbox*.md`, `summary.txt`, `out/` and `logs/` are git-ignored and stay on head01 / NAS.
 Draft scope rules: `docs/scope.md`. Planned work: `docs/first-issues.md`.

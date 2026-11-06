@@ -21,8 +21,12 @@ Keep usage LOW: Karlo needs his Claude allowance for university work. Do only wh
 - In tracker tables, the Closes column holds ONLY the closing date (YYYY-MM-DD, optionally "(board)") or "Not stated"/"Rolling". Put "checked on" notes in another column or below the table, never in Closes.
 
 ## Files
-- `tracker.md` – the single source of truth. Sections: Applied, Apply now, Possibly open, Skip / closed.
-- `inbox.md` – Karlo's updates (one per line). Process and then move processed lines to `inbox-archive.md`.
+- `watchlist.json` – the single source of truth: one persistent list of every role, with status
+  `found → shortlisted → pack_ready → submitted → outcome`. Only `watchlist.py` writes it.
+- `tracker.md` – generated from `watchlist.json` (sections: Applied, Apply now, Possibly open,
+  Junior infra – watch list, Skip / closed). Read it; never edit it.
+- `scan_results.json` – everything the scan found or re-checked this run; merged into the watchlist by URL.
+- `inbox.md` – Karlo's updates (one per line). Never edit it.
 - `facts.md` – the only facts allowed in CV/cover-letter text.
 - `new_roles.json` – hand-off between the scan and tailor steps.
 - `out/` – generated CVs, cover letters and .ics files.

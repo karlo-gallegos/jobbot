@@ -9,7 +9,11 @@ logs/
 facts.md
 new_roles*.json
 watchlist.json
+watchlist.json.tmp
+scan_results.json
 tracker.md
+tracker.md.tmp
+tracker-pre-watchlist.md
 inbox.md
 inbox-archive.md
 summary.txt

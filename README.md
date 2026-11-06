@@ -7,6 +7,10 @@ Every Sunday at 18:31 it:
 4. builds tailored `.docx` CVs/letters from your own base documents (plain Python, no AI); `out/deadlines.ics` is rewritten from the whole watchlist whenever it changes
 5. sends a summary to your phone via ntfy
 
+Every morning at 08:13 `reminders.py` pings deadlines (3 days, tomorrow, today) and, for up to 2
+roles closing within 36 hours that still have no pack, runs the same tailor step as `retailor.sh`
+on just that role (via `pack_role.json`; **Sonnet**, so it uses your plan) and builds the CV/letter.
+
 It never applies, signs in or submits. You do that, then add a line to `inbox.md`.
 
 ## Install (Debian 13 management node)

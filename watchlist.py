@@ -15,6 +15,7 @@ role = {"key": normalised link, "link", "employer", "role", "location",
         "status": found | shortlisted | pack_ready | submitted | outcome,
         "outcome": null | interview | offer | rejected | skipped | withdrawn | closed,
         "applied": "YYYY-MM-DD" | null, "own_words_only": bool, "experience", "notes", "slug",
+        "cv_type": "infra" | "software", "needs_cover_letter": bool, "pack_attempt": "YYYY-MM-DD",
         "pack": [file names], "found", "last_seen", "history": [{"at", "status", "outcome"?, "note"?}]}
 
 The first load without watchlist.json imports the old hand-kept tracker.md tables
@@ -34,7 +35,8 @@ MONTHS = {m: i for i, m in enumerate(
     ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"], 1)}
 # Fields a scan / new_roles item may set or update on a role.
 SCAN_FIELDS = ("employer", "role", "location", "closing_date", "date_from_board", "kind",
-               "confirmed", "experience", "notes", "slug", "own_words_only")
+               "confirmed", "experience", "notes", "slug", "own_words_only", "cv_type",
+               "needs_cover_letter")
 
 
 # ---------- dates ----------

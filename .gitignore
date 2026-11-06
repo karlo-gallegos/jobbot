@@ -11,6 +11,7 @@ new_roles*.json
 watchlist.json
 watchlist.json.tmp
 scan_results.json
+pack_role.json
 tracker.md
 tracker.md.tmp
 tracker-pre-watchlist.md

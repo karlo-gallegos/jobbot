@@ -2,7 +2,7 @@
 """Turn new_roles.json into tailored CV/cover-letter .docx files, then mark those roles
 pack_ready in watchlist.json and rewrite tracker.md and out/deadlines.ics.
 No AI here: it only copies the base documents and swaps in text the tailor step wrote."""
-import json, datetime, pathlib
+import json, sys, datetime, pathlib
 import docx
 import watchlist
 
@@ -67,9 +67,11 @@ def build_letter(role):
     return out
 
 
-def main():
+def main(argv):
+    """build_docs.py [ROLES_FILE]  (default new_roles.json; reminders.py passes pack_role.json)"""
     today = datetime.date.today()
-    roles = json.loads((ROOT / "new_roles.json").read_text() or "[]")
+    src = pathlib.Path(argv[1]) if len(argv) > 1 else ROOT / "new_roles.json"
+    roles = json.loads((src if src.is_absolute() else ROOT / src).read_text() or "[]")
     made = []
     wl = watchlist.load(today)
     for r in roles:
@@ -97,4 +99,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv)

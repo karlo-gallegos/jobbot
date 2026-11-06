@@ -1,11 +1,18 @@
 # Secrets
-.env
+config.env
 .deploy_key*
 
-# Personal data – lives on head01 / NAS only
-data/
+# Personal data and run state – lives on head01 / NAS only
+base/
 out/
-master/
+logs/
+facts.md
+new_roles*.json
+watchlist.json
+tracker.md
+inbox.md
+inbox-archive.md
+summary.txt
 *.docx
 *.pdf
 *.ics

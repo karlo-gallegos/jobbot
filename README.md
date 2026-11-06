@@ -1,38 +1,27 @@
 # jobbot
 
-Personal graduate-job assistant running on head01. It **finds** roles, **shortlists** them
-with me, **builds** a tailored CV Profile + cover letter pack, and **reminds** me of
-deadlines. It never submits anything. Rules for Claude Code are in [CLAUDE.md](CLAUDE.md).
+Personal graduate-job assistant on head01 (`/opt/jobbot`). It finds roles, builds a
+tailored CV Profile + cover letter, and reminds me of deadlines. It never submits anything.
+Scope and rules: [docs/scope.md](docs/scope.md).
 
-## Layout
-```
-bin/
-  run.sh             Sunday scan of job boards → watchlist (status: found)
-  retailor.sh        build packs for shortlisted roles (Claude API)
-  inbox_add.sh       add a role from the iPhone Shortcut (over SSH)
-  deadline_watch.py  07:30 / 18:00: build packs for roles closing within 36h, ntfy alert
-prompts/rules.md     tailoring rules given to Claude
-systemd/             unit templates (rendered by Ansible)
-ansible/deploy.yml   the only way code reaches /opt/jobbot
-docs/watchlist.md    schema + status flow for the one role list
-```
+## What runs
+| When | What | Does |
+|---|---|---|
+| Sun 18:31 (cron) | `run.sh` | `claude -p prompts/scan.md` → `new_roles.json`; `claude -p prompts/tailor.md` adds Profile + letter text; `build_docs.py` writes .docx + .ics to `out/`; rsync to NAS; ntfy summary |
+| daily 08:13 (cron) | `reminders.py` | reads `tracker.md`, ntfy alert 3 days / 1 day / day-of before each close |
+| manual | `retailor.sh` | re-runs tailor + build on the current `new_roles.json` |
+| iPhone Shortcut (SSH) | `inbox_add.sh "<update>"` | appends to `inbox.md`; `interview …` lines also run `prep.sh` |
 
-Not in git (head01 / NAS only): `.env`, `data/watchlist.json`, `master/` (cv_master.docx,
-letter_template.docx with `{{RECIPIENT}}`, `{{DATE}}`, `{{BODY}}`), `out/` packs.
+Claude calls go through the Claude Code CLI (`claude -p`, in `~/.local/bin` for user `karlo`),
+not the API SDK, so there is no API key or Python venv to manage.
+
+## Not in git
+`config.env` (from `config.env.example`), `base/` CVs + letter template, `facts.md`,
+`new_roles.json`, `tracker.md`, `inbox.md`, `out/`, `logs/`.
 
 ## Deploy
 ```bash
-# one-off on head01: deploy key for the private repo
-sudo -u jobbot ssh-keygen -t ed25519 -f /home/jobbot/.ssh/jobbot_deploy -N ''
-# add the .pub as a read-only Deploy Key on GitHub, then:
-cp ansible/inventory.example.ini ansible/inventory.ini
-ansible-playbook -i ansible/inventory.ini ansible/deploy.yml
+cd /opt/jobbot && git pull --ff-only
+# or, from anywhere with Ansible:
+ansible-playbook -i 'head01,' ansible/deploy.yml
 ```
-Before the first deploy: create `/opt/jobbot/.env` from `.env.example` (chmod 600) and copy
-the master CV and letter template into `/opt/jobbot/master/`.
-
-## Work tracking
-GitHub Issues. Anything outside find / shortlist / build / remind gets the `later` label.
-
-## Status flow
-`found → shortlisted → pack_ready → submitted → outcome`

@@ -1,17 +1,25 @@
-# Issues to open after the first commit
+# Issues to open
 
 Labels: `bot` (in scope), `later` (scope creep – park it), `bug`.
+Written against what is actually on head01 on 6 Nov 2026.
 
-1. **[bot] Merge new_roles.json into watchlist.json** – one list, statuses per docs/watchlist.md;
-   one-off migration script; retailor.sh reads/writes watchlist only.
-2. **[bot] Retire the hand-edited tracker** – generate a read-only markdown/HTML summary
-   from watchlist.json after each run (or drop it).
-3. **[bot] .ics deadline feed** – write `deadlines.ics` from watchlist (roles in
-   shortlisted / pack_ready), serve it over Tailscale or publish to the NAS, subscribe in
-   Apple Calendar. Alarm 48h and 12h before close.
-4. **[bot] deadline_watch.py uses the same Claude call as retailor.sh** – factor the call
-   into one shared helper so prompts/rules.md is the only place tailoring rules live.
-5. **[bot] First live test of deadline_watch.py** – mock role closing in <36h, real API call,
-   check pack + ntfy, confirm nothing is submitted.
-6. **[bot] Move the Sunday scan onto a systemd timer** managed by deploy.yml (if it's still cron).
-7. **[later]** anything else that comes up.
+1. **[bot] One persistent role list.** Today `new_roles.json` is wiped to `[]` every Sunday
+   (a per-run batch), `tracker.md` is the real list (reminders.py parses its tables), and the
+   claude.ai project tracker is a hand-kept copy. Add `watchlist.json` with statuses
+   `found → shortlisted → pack_ready → submitted → outcome`; scan merges into it by URL;
+   `tracker.md` is generated from it; `reminders.py` reads it instead of parsing markdown.
+2. **[bot] inbox.md updates set statuses.** "applied X" → `submitted`, "interview X" →
+   `outcome: interview`, "rejected X" → `outcome: rejected`; processed lines move to
+   `inbox-archive.md`.
+3. **[bot] One stable .ics feed.** `build_ics` writes a dated file each run
+   (`Grad_Deadlines_YYYY-MM-DD.ics`) covering only that run's roles. Write one
+   `deadlines.ics` from the whole watchlist and serve it (NAS or Tailscale) so Apple
+   Calendar subscribes once and stays current.
+4. **[bot] Pack for roles closing within 36h.** `deadline_watch.py` from the 6 Nov handover is
+   not on head01. Either recover it, or (simpler) have `reminders.py` call the same
+   `claude -p prompts/tailor.md` step `retailor.sh` uses, for one role, then `build_docs.py`.
+5. **[bot] Cron in the repo.** Manage the two crontab lines with `ansible.builtin.cron`
+   in `deploy.yml` so the schedule is versioned.
+6. **[bot] Merge `docs/scope.md` into the live CLAUDE.md** used by the `claude -p` runs.
+7. **[later] Interview prep packs (`prep.sh`)** – exists already, but interviews sit on
+   Karlo's side of the scope line. Decide: keep as-is, or park.

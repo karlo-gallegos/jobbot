@@ -1,116 +1,53 @@
 ---
-# Deploy jobbot to head01. Code comes from git; data, CVs and .env are never touched.
-#   ansible-playbook -i ansible/inventory.ini ansible/deploy.yml
+# Deploy jobbot code to /opt/jobbot. Never touches config.env, base/, out/, logs/ or data files.
+#   On head01:        ansible-playbook -i 'localhost,' -c local ansible/deploy.yml -K
+#   From the Mac:     ansible-playbook -i '100.122.249.103,' -u karlo ansible/deploy.yml -K
 - name: Deploy jobbot
-  hosts: jobbot
-  become: true
+  hosts: all
   vars:
     jobbot_home: /opt/jobbot
-    jobbot_user: jobbot
-    jobbot_repo: git@github.com:karlo-gallegos/jobbot.git
+    jobbot_user: karlo            # owns the Claude Code login in ~/.local/bin
     jobbot_branch: main
-    jobbot_deploy_key: /home/{{ jobbot_user }}/.ssh/jobbot_deploy
     jobbot_apt_packages:
       - git
-      - libreoffice-writer-nogui
-      - poppler-utils
-      - python3-venv
-      - fonts-crosextra-carlito
+      - rsync
+      - curl
+      - python3-docx
+      - libreoffice-writer-nogui    # .docx -> .pdf (merged-PDF packs)
+      - poppler-utils               # pdfunite
+      - fonts-crosextra-carlito     # Calibri-metric font so PDFs match Word layout
       - fonts-liberation
-    jobbot_pip_packages:
-      - anthropic
-      - python-docx
 
   tasks:
     - name: Install system packages
+      become: true
       ansible.builtin.apt:
         name: "{{ jobbot_apt_packages }}"
         state: present
         update_cache: true
         cache_valid_time: 3600
 
-    - name: Ensure jobbot user exists
-      ansible.builtin.user:
-        name: "{{ jobbot_user }}"
-        system: true
-        create_home: true
-        shell: /usr/sbin/nologin
-
-    - name: Ensure jobbot home exists
-      ansible.builtin.file:
-        path: "{{ jobbot_home }}"
-        state: directory
-        owner: "{{ jobbot_user }}"
-        mode: "0750"
-
-    - name: Check out code
-      become_user: "{{ jobbot_user }}"
-      ansible.builtin.git:
-        repo: "{{ jobbot_repo }}"
-        dest: "{{ jobbot_home }}"
-        version: "{{ jobbot_branch }}"
-        key_file: "{{ jobbot_deploy_key }}"
-        accept_hostkey: true
-        force: false   # fail loudly if someone hand-edited /opt/jobbot
-      notify: Restart timers
-
-    - name: Ensure data directories exist (never overwritten)
-      ansible.builtin.file:
-        path: "{{ jobbot_home }}/{{ item }}"
-        state: directory
-        owner: "{{ jobbot_user }}"
-        mode: "0750"
-      loop: [data, out, master]
-
-    - name: Create virtualenv with Python deps
-      become_user: "{{ jobbot_user }}"
-      ansible.builtin.pip:
-        name: "{{ jobbot_pip_packages }}"
-        virtualenv: "{{ jobbot_home }}/venv"
-        virtualenv_command: python3 -m venv
-
-    - name: Check .env is present
+    - name: Check config.env is present
       ansible.builtin.stat:
-        path: "{{ jobbot_home }}/.env"
-      register: jobbot_env
+        path: "{{ jobbot_home }}/config.env"
+      register: jobbot_cfg
 
-    - name: Stop if .env is missing
+    - name: Stop if config.env is missing
       ansible.builtin.fail:
-        msg: "Create {{ jobbot_home }}/.env from .env.example (chmod 600) before deploying."
-      when: not jobbot_env.stat.exists
+        msg: "Create {{ jobbot_home }}/config.env from config.env.example (chmod 600) first."
+      when: not jobbot_cfg.stat.exists
 
-    - name: Check master CV and letter template are present
-      ansible.builtin.stat:
-        path: "{{ jobbot_home }}/master/{{ item }}"
-      loop: [cv_master.docx, letter_template.docx]
-      register: jobbot_masters
+    - name: Refuse to deploy over hand edits
+      become: true
+      become_user: "{{ jobbot_user }}"
+      ansible.builtin.command: git -C {{ jobbot_home }} status --porcelain --untracked-files=no
+      register: jobbot_dirty
+      changed_when: false
+      failed_when: jobbot_dirty.stdout | length > 0
 
-    - name: Warn about missing master files
-      ansible.builtin.debug:
-        msg: "Missing {{ item.item }} in {{ jobbot_home }}/master – packs will fail until it is copied in."
-      loop: "{{ jobbot_masters.results }}"
-      when: not item.stat.exists
-
-    - name: Install systemd units
-      ansible.builtin.template:
-        src: "../systemd/{{ item }}.j2"
-        dest: "/etc/systemd/system/{{ item }}"
-        mode: "0644"
-      loop:
-        - jobbot-deadline.service
-        - jobbot-deadline.timer
-      notify: Restart timers
-
-    - name: Enable deadline timer
-      ansible.builtin.systemd:
-        name: jobbot-deadline.timer
-        enabled: true
-        state: started
-        daemon_reload: true
-
-  handlers:
-    - name: Restart timers
-      ansible.builtin.systemd:
-        name: jobbot-deadline.timer
-        state: restarted
-        daemon_reload: true
+    - name: Pull latest code
+      become: true
+      become_user: "{{ jobbot_user }}"
+      ansible.builtin.command: git -C {{ jobbot_home }} pull --ff-only origin {{ jobbot_branch }}
+      register: jobbot_pull
+      changed_when: "'Already up to date' not in jobbot_pull.stdout"

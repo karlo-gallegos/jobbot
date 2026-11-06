@@ -65,12 +65,21 @@ def build_letter(role):
     return out
 
 
+def parse_closing(value):
+    """Return (date, time-or-None) for "YYYY-MM-DD" or "YYYY-MM-DDTHH:MM[:SS]".
+    Raises ValueError if the first 10 characters are not a date."""
+    close = datetime.date.fromisoformat(value[:10])
+    m = re.match(r"[T ](\d{1,2}):(\d{2})", value[10:])
+    at = datetime.time(int(m.group(1)), int(m.group(2))) if m else None
+    return close, at
+
+
 def build_ics(roles, today):
-    def ev(uid, day, summary, desc):
-        dt = day.strftime("%Y%m%d")
+    def ev(uid, s, summary, desc):
+        e = s + datetime.timedelta(hours=1)  # one-hour event starting at s
         return [
             "BEGIN:VEVENT", f"UID:{uid}@jobbot", f"DTSTAMP:{today:%Y%m%d}T000000Z",
-            f"DTSTART;TZID=Europe/London:{dt}T120000", f"DTEND;TZID=Europe/London:{dt}T130000",
+            f"DTSTART;TZID=Europe/London:{s:%Y%m%dT%H%M%S}", f"DTEND;TZID=Europe/London:{e:%Y%m%dT%H%M%S}",
             f"SUMMARY:{summary}", f"DESCRIPTION:{desc}",
             "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:Reminder", "TRIGGER:-PT0M", "END:VALARM",
             "END:VEVENT",
@@ -80,11 +89,21 @@ def build_ics(roles, today):
     for r in roles:
         if not r.get("closing_date"):
             continue
-        close = datetime.date.fromisoformat(r["closing_date"])
-        lines += ev(f"{r['slug']}-close-{close}", close, f"Closes: {r['employer']} – {r['role']}", r["link"])
+        try:
+            close, at = parse_closing(r["closing_date"])
+        except ValueError:
+            print(f"Skipping .ics for {r.get('slug')}: bad closing_date {r['closing_date']!r}", file=sys.stderr)
+            continue
+        noon = datetime.time(12, 0)
+        if at:  # timed deadline: the event ends at the closing time
+            start, at_s = datetime.datetime.combine(close, at) - datetime.timedelta(hours=1), f" {at:%H:%M}"
+        else:  # date-only deadline: midday event
+            start, at_s = datetime.datetime.combine(close, noon), ""
+        lines += ev(f"{r['slug']}-close-{close}", start, f"Closes{at_s}: {r['employer']} – {r['role']}", r["link"])
         remind = close - datetime.timedelta(days=4)
         if remind >= today:
-            lines += ev(f"{r['slug']}-remind-{close}", remind, f"Apply: {r['employer']} (closes {close:%a %d %b})", r["link"])
+            lines += ev(f"{r['slug']}-remind-{close}", datetime.datetime.combine(remind, noon),
+                        f"Apply: {r['employer']} (closes {close:%a %d %b}{at_s})", r["link"])
         n += 1
     lines.append("END:VCALENDAR")
     if n:

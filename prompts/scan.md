@@ -9,7 +9,7 @@ Weekly scan. Follow CLAUDE.md. Get today's date with `date +%F`.
 3. Update `tracker.md`: graduate roles under "Possibly open" (or "Apply now" if confirmed on the employer's site); entry-level roles that can start June–Sept 2027 under "Possibly open" with "(entry-level)" after the role; immediate-start entry-level roles under a section "Junior infra – watch list" (Employer | Role | Location | Experience | Link) – keep max 12 rows, newest first; move anything closed to "Skip / closed"; update the "Last checked" line.
 
 4. Write `new_roles.json`: a JSON array of NEW applicable roles (graduate, or entry-level startable summer 2027 – or any entry-level from 2027-03-01) closing within 21 days of today or with a rolling/unstated deadline, maximum 3, best infrastructure fit first then soonest closing. Each item:
-   {"employer": str, "slug": str (letters/digits only), "role": str, "location": str, "closing_date": "YYYY-MM-DD" or null, "link": str, "cv_type": "infra" or "software", "needs_cover_letter": bool, "own_words_only": bool}
+   {"employer": str, "slug": str (letters/digits only), "role": str, "location": str, "closing_date": "YYYY-MM-DD" (or "YYYY-MM-DDTHH:MM" if the listing states a time) or null, "link": str, "cv_type": "infra" or "software", "needs_cover_letter": bool, "own_words_only": bool}
    Write `[]` if none.
 
 5. Write `summary.txt` (max 12 lines, plain text): new roles (employer – role – closing date), new watch-list employers, anything that closed, anything needing Karlo.

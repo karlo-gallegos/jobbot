@@ -10,8 +10,10 @@ LOG="logs/run-$TODAY.log"
 notify() { curl -fsS -H "Title: Jobbot" -d "$1" "https://ntfy.sh/$NTFY_TOPIC" >/dev/null || true; }
 trap 'notify "Jobbot run failed on $TODAY – see $LOG"' ERR
 
-# tracker.md is generated from watchlist.json (first run imports the old tracker.md)
-python3 watchlist.py render >> "$LOG" 2>&1
+# Apply inbox.md updates and regenerate tracker.md from watchlist.json
+# (first run imports the old tracker.md)
+echo "== $(date) inbox" >> "$LOG"
+python3 watchlist.py inbox >> "$LOG" 2>&1
 
 echo "== $(date) scan ($SCAN_MODEL)" >> "$LOG"
 echo "[]" > new_roles.json

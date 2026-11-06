@@ -26,7 +26,7 @@ Keep usage LOW: Karlo needs his Claude allowance for university work. Do only wh
 - `tracker.md` – generated from `watchlist.json` (sections: Applied, Apply now, Possibly open,
   Junior infra – watch list, Skip / closed). Read it; never edit it.
 - `scan_results.json` – everything the scan found or re-checked this run; merged into the watchlist by URL.
-- `inbox.md` – Karlo's updates (one per line). Never edit it.
+- `inbox.md` – Karlo's updates (one per line). `watchlist.py inbox` applies them and moves them to `inbox-archive.md`. Never edit either.
 - `facts.md` – the only facts allowed in CV/cover-letter text.
 - `new_roles.json` – hand-off between the scan and tailor steps.
 - `out/` – generated CVs, cover letters and .ics files.

@@ -32,7 +32,13 @@ def open_roles(wl):
 def main():
     today = datetime.date.today()
     alerts = []
-    for employer, role, close, at in open_roles(watchlist.load(today)):
+    wl = watchlist.load(today)
+    for m in watchlist.process_inbox(wl, today):  # so "applied X" stops reminders the next morning
+        print(m)
+    watchlist.refresh(wl, today)
+    watchlist.save(wl)
+    watchlist.render(wl, today)
+    for employer, role, close, at in open_roles(wl):
         days = (close - today).days
         if days in ALERT_DAYS:
             when = f"{close:%a %d %b}" + (f" {at:%H:%M}" if at else "")

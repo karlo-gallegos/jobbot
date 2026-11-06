@@ -6,12 +6,17 @@ set -euo pipefail
 cd "$(dirname "$0")"
 LINE="$(printf '%s' "$*" | tr -d '\r\n' | tr -s ' ' | cut -c1-200)"
 [ -z "$LINE" ] && { echo "Nothing to add"; exit 1; }
-echo "$LINE" >> inbox.md
+{ flock 9; echo "$LINE" >&9; } 9>>inbox.md   # same lock as watchlist.py inbox
 source ./config.env
-curl -fsS -H "Title: Jobbot inbox" -d "Noted: $LINE" "https://ntfy.sh/$NTFY_TOPIC" >/dev/null || true
+mkdir -p logs
+# Apply it to watchlist.json / tracker.md now; if that fails the line stays in inbox.md for the next run.
+RESULT="$(python3 watchlist.py inbox 2>>logs/inbox.log | tail -n 1 || true)"
+curl -fsS -H "Title: Jobbot inbox" -d "Noted: $LINE${RESULT:+
+$RESULT}" "https://ntfy.sh/$NTFY_TOPIC" >/dev/null || true
 if [[ "${LINE,,}" == interview* ]]; then
   nohup ./prep.sh "$LINE" >> logs/prep.log 2>&1 &
-  echo "Added. Interview prep pack is being written."
+  echo "Added. Interview prep pack is being written.${RESULT:+
+$RESULT}"
 else
-  echo "Added: $LINE"
+  echo "Added: ${RESULT:-$LINE}"
 fi

@@ -1,7 +1,7 @@
 # Jobbot – weekly graduate job search on your own server
 
 Every Sunday at 18:31 it:
-1. reads `inbox.md` (your updates) and updates `tracker.md`
+1. applies `inbox.md` (your updates) to `watchlist.json` and regenerates `tracker.md` (plain Python; also done straight away by `inbox_add.sh` and each morning by `reminders.py`)
 2. searches gradireland, Gradcracker NI, TargetJobs/Prospects and Bright Network for new 2027 tech grad roles on the island of Ireland and re-checks existing ones (**Haiku**); `watchlist.py` merges the results into `watchlist.json` by URL and regenerates `tracker.md`
 3. writes a Profile sentence and, where required, a cover letter for up to 3 new roles (**Sonnet**)
 4. builds tailored `.docx` CVs/letters from your own base documents and a `.ics` of deadlines (plain Python, no AI)
@@ -39,6 +39,12 @@ rejected Citi
 interview TD Securities 20 Nov
 skip Version 1
 ```
+Verbs: `applied` → submitted · `interview` / `rejected` / `offer` / `withdrawn` → outcome ·
+`skip` → outcome: skipped · `shortlist` → shortlisted. Then the employer name, then (if the employer
+has more than one role) words from the role title, e.g. `applied CGI cloud`. A trailing date is
+kept as a note. Applied lines move to `inbox-archive.md`; a line that matches no role or several
+roles is commented out in `inbox.md` with the reason (`# NOT APPLIED …`) – send it again, more specific.
+`applied X` for a role the scan never found adds it to the list.
 
 ## Usage / cost
 - Scan on Haiku and tailor on Sonnet keeps usage low; change models in `config.env`.

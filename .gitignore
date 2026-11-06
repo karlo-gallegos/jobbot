@@ -1,0 +1,21 @@
+# Secrets
+.env
+.deploy_key*
+
+# Personal data – lives on head01 / NAS only
+data/
+out/
+master/
+*.docx
+*.pdf
+*.ics
+
+# Python
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# Misc
+*.log
+.DS_Store

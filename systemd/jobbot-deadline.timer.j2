@@ -1,0 +1,11 @@
+# Managed by ansible/deploy.yml – edit in git, not on head01.
+[Unit]
+Description=Run jobbot deadline watch at 07:30 and 18:00
+
+[Timer]
+OnCalendar=*-*-* 07:30:00
+OnCalendar=*-*-* 18:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

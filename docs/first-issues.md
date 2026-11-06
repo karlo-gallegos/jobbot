@@ -3,6 +3,10 @@
 Labels: `bot` (in scope), `later` (scope creep – park it), `bug`.
 Written against what is actually on head01 on 6 Nov 2026.
 
+0. **[bug] build_docs.py crashes on a closing date with a time.** The SONI entry has
+   `"closing_date": "2026-11-06T12:00"`; `datetime.date.fromisoformat()` rejects that on
+   Python 3.13, so `build_ics` raises, `run.sh` fails and ntfy says "run failed". Fix:
+   parse `closing_date[:10]`, and keep the time if present for the .ics event.
 1. **[bot] One persistent role list.** Today `new_roles.json` is wiped to `[]` every Sunday
    (a per-run batch), `tracker.md` is the real list (reminders.py parses its tables), and the
    claude.ai project tracker is a hand-kept copy. Add `watchlist.json` with statuses

@@ -1,27 +1,60 @@
-# jobbot
+# Jobbot – weekly graduate job search on your own server
 
-Personal graduate-job assistant on head01 (`/opt/jobbot`). It finds roles, builds a
-tailored CV Profile + cover letter, and reminds me of deadlines. It never submits anything.
-Scope and rules: [docs/scope.md](docs/scope.md).
+Every Sunday at 18:31 it:
+1. reads `inbox.md` (your updates) and updates `tracker.md`
+2. searches gradireland, Gradcracker NI, TargetJobs/Prospects and Bright Network for new 2027 tech grad roles on the island of Ireland and re-checks existing ones (**Haiku**)
+3. writes a Profile sentence and, where required, a cover letter for up to 3 new roles (**Sonnet**)
+4. builds tailored `.docx` CVs/letters from your own base documents and a `.ics` of deadlines (plain Python, no AI)
+5. sends a summary to your phone via ntfy
 
-## What runs
-| When | What | Does |
-|---|---|---|
-| Sun 18:31 (cron) | `run.sh` | `claude -p prompts/scan.md` → `new_roles.json`; `claude -p prompts/tailor.md` adds Profile + letter text; `build_docs.py` writes .docx + .ics to `out/`; rsync to NAS; ntfy summary |
-| daily 08:13 (cron) | `reminders.py` | reads `tracker.md`, ntfy alert 3 days / 1 day / day-of before each close |
-| manual | `retailor.sh` | re-runs tailor + build on the current `new_roles.json` |
-| iPhone Shortcut (SSH) | `inbox_add.sh "<update>"` | appends to `inbox.md`; `interview …` lines also run `prep.sh` |
+It never applies, signs in or submits. You do that, then add a line to `inbox.md`.
 
-Claude calls go through the Claude Code CLI (`claude -p`, in `~/.local/bin` for user `karlo`),
-not the API SDK, so there is no API key or Python venv to manage.
-
-## Not in git
-`config.env` (from `config.env.example`), `base/` CVs + letter template, `facts.md`,
-`new_roles.json`, `tracker.md`, `inbox.md`, `out/`, `logs/`.
-
-## Deploy
+## Install (Debian 13 management node)
 ```bash
-cd /opt/jobbot && git pull --ff-only
-# or, from anywhere with Ansible:
-ansible-playbook -i 'head01,' ansible/deploy.yml
+sudo mkdir -p /opt/jobbot && sudo chown "$USER" /opt/jobbot
+tar -xzf jobbot.tar.gz -C /opt            # gives /opt/jobbot
+sudo apt install -y python3-docx curl
+curl -fsSL https://claude.ai/install.sh | bash    # Claude Code CLI
+claude                                     # sign in once (claude.ai account), then /exit
+cd /opt/jobbot && cp config.env.example config.env && nano config.env   # set NTFY_TOPIC
 ```
+Phone: install the ntfy app and subscribe to the same topic name.
+
+Test once by hand: `./run.sh && tail -n 40 logs/run-$(date +%F).log`
+
+Schedule (server timezone must be Europe/London: `sudo timedatectl set-timezone Europe/London`):
+```bash
+crontab -e
+31 18 * * 0 /opt/jobbot/run.sh >> /opt/jobbot/logs/cron.log 2>&1
+```
+
+## Seeing the files on your Mac
+Easiest: put `/opt/jobbot` on an Unraid share instead (e.g. mount `//tower/jobbot` on the node with CIFS/NFS and install there), then open the share in Finder. `out/` holds the CVs, letters and .ics.
+
+## Telling it about updates
+Edit `inbox.md` from anywhere (Finder via the share, or SSH over Tailscale):
+```
+applied CGI
+rejected Citi
+interview TD Securities 20 Nov
+skip Version 1
+```
+
+## Usage / cost
+- Scan on Haiku and tailor on Sonnet keeps usage low; change models in `config.env`.
+- Runs count against your Claude plan when signed in with your account. To keep it off your plan entirely, set `ANTHROPIC_API_KEY` in `config.env` (pay-per-use API billing) instead of signing in.
+- Search budget is capped in `prompts/scan.md` (20 searches + 8 fetches).
+
+## Check before relying on it
+- CLI flags in `run.sh` (`--allowedTools`, `--permission-mode`, `--max-turns`) – if your Claude Code version differs, run `claude --help` and adjust.
+- Addressee lines in generated cover letters, and every tailored Profile sentence, before you upload.
+- Base documents are in `base/` (copies of your Google CV, Kainos CV and Options cover letter). Update them there when your CV changes.
+
+## Code in git (from 6 Nov 2026)
+`/opt/jobbot` is a checkout of github.com/karlo-gallegos/jobbot (read-only deploy key on head01).
+The tarball install above is superseded: change code in the repo, then on head01
+`cd /opt/jobbot && git pull --ff-only` (or run `ansible/deploy.yml`). Don't hand-edit tracked files.
+
+Git holds code only. `config.env`, `base/`, `facts.md`, `new_roles*.json`, `tracker.md`,
+`inbox*.md`, `summary.txt`, `out/` and `logs/` are git-ignored and stay on head01 / NAS.
+Draft scope rules: `docs/scope.md`. Planned work: `docs/first-issues.md`.

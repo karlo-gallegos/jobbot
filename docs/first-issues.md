@@ -2,6 +2,7 @@
 
 Labels: `bot` (in scope), `later` (scope creep – park it), `bug`.
 Written against what is actually on head01 on 6 Nov 2026.
+Opened and fixed on 6 Nov 2026 as #1–#7 (items 0–6). Item 7 not opened yet (undecided).
 
 0. **[bug] build_docs.py crashes on a closing date with a time.** The SONI entry has
    `"closing_date": "2026-11-06T12:00"`; `datetime.date.fromisoformat()` rejects that on
@@ -24,6 +25,6 @@ Written against what is actually on head01 on 6 Nov 2026.
    `claude -p prompts/tailor.md` step `retailor.sh` uses, for one role, then `build_docs.py`.
 5. **[bot] Cron in the repo.** Manage the two crontab lines with `ansible.builtin.cron`
    in `deploy.yml` so the schedule is versioned.
-6. **[bot] Merge `docs/scope.md` into the live CLAUDE.md** used by the `claude -p` runs.
+6. **[bot] Merge `docs/scope.md` into the live CLAUDE.md** (done; draft removed) used by the `claude -p` runs.
 7. **[later] Interview prep packs (`prep.sh`)** – exists already, but interviews sit on
    Karlo's side of the scope line. Decide: keep as-is, or park.

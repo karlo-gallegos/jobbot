@@ -90,4 +90,4 @@ check the generated `tracker.md` against it once. Rebuild by hand: `python3 watc
 
 Git holds code only. `config.env`, `base/`, `facts.md`, `new_roles*.json`, `watchlist.json`, `scan_results.json`, `tracker.md`,
 `inbox*.md`, `summary.txt`, `out/` and `logs/` are git-ignored and stay on head01 / NAS.
-Draft scope rules: `docs/scope.md`. Planned work: `docs/first-issues.md`.
+Scope and rules (for the cron runs and for code changes): `CLAUDE.md`. Planned work: `docs/first-issues.md` / GitHub issues.

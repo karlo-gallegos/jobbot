@@ -29,4 +29,4 @@ Keep usage LOW: Karlo needs his Claude allowance for university work. Do only wh
 - `inbox.md` – Karlo's updates (one per line). `watchlist.py inbox` applies them and moves them to `inbox-archive.md`. Never edit either.
 - `facts.md` – the only facts allowed in CV/cover-letter text.
 - `new_roles.json` – hand-off between the scan and tailor steps.
-- `out/` – generated CVs, cover letters and .ics files.
+- `out/` – generated CVs and cover letters, and `deadlines.ics` (written by `watchlist.py`).

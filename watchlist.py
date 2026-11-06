@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The one persistent role list (watchlist.json) and the tracker.md generated from it. No AI.
 
-  python3 watchlist.py render            write tracker.md from watchlist.json
+  python3 watchlist.py render            write tracker.md and out/deadlines.ics from watchlist.json
   python3 watchlist.py merge [FILE ...]  merge scan output by URL (default: scan_results.json
                                          new_roles.json), then write tracker.md
   python3 watchlist.py inbox             apply inbox.md lines (applied / interview / rejected /
@@ -20,12 +20,14 @@ role = {"key": normalised link, "link", "employer", "role", "location",
 The first load without watchlist.json imports the old hand-kept tracker.md tables
 (a copy is kept as tracker-pre-watchlist.md). Roles are never removed.
 """
-import datetime, fcntl, json, os, pathlib, re, shutil, sys, urllib.parse
+import datetime, fcntl, hashlib, json, os, pathlib, re, shutil, sys, urllib.parse
 
 ROOT = pathlib.Path(__file__).resolve().parent
 WATCHLIST, TRACKER = ROOT / "watchlist.json", ROOT / "tracker.md"
 TRACKER_BACKUP = ROOT / "tracker-pre-watchlist.md"
 INBOX, INBOX_ARCHIVE = ROOT / "inbox.md", ROOT / "inbox-archive.md"
+ICS = ROOT / "out" / "deadlines.ics"   # one stable feed; Apple Calendar subscribes to it
+REMIND_DAYS = 4
 OPEN = ("found", "shortlisted", "pack_ready")
 WATCH_ROWS = 12
 MONTHS = {m: i for i, m in enumerate(
@@ -425,6 +427,84 @@ def render(wl, today):
     tmp = TRACKER.with_suffix(".md.tmp")
     tmp.write_text("\n".join(lines))
     os.replace(tmp, TRACKER)
+    write_ics(wl, today)
+
+
+# ---------- out/deadlines.ics ----------
+VTIMEZONE_LONDON = [
+    "BEGIN:VTIMEZONE", "TZID:Europe/London",
+    "BEGIN:DAYLIGHT", "TZOFFSETFROM:+0000", "TZOFFSETTO:+0100", "TZNAME:BST",
+    "DTSTART:19700329T010000", "RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU", "END:DAYLIGHT",
+    "BEGIN:STANDARD", "TZOFFSETFROM:+0100", "TZOFFSETTO:+0000", "TZNAME:GMT",
+    "DTSTART:19701025T020000", "RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU", "END:STANDARD",
+    "END:VTIMEZONE",
+]
+
+
+def _ics_text(v):
+    return str(v).replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
+
+
+def _fold(line):
+    """RFC 5545: lines over 75 octets continue on the next line after a space."""
+    out, cur = [], ""
+    for ch in line:
+        if len((cur + ch).encode()) > (75 if not out else 74):
+            out.append(cur)
+            cur = ""
+        cur += ch
+    out.append(cur)
+    return "\r\n ".join(out)
+
+
+def ics_events(wl, today):
+    """Closing + 'apply' reminder events for every role still to apply for."""
+    stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    noon = datetime.time(12, 0)
+    events = []
+
+    def ev(uid, start, summary, desc):
+        end = start + datetime.timedelta(hours=1)
+        return ["BEGIN:VEVENT", f"UID:{uid}@jobbot", f"DTSTAMP:{stamp}",
+                f"DTSTART;TZID=Europe/London:{start:%Y%m%dT%H%M%S}",
+                f"DTEND;TZID=Europe/London:{end:%Y%m%dT%H%M%S}",
+                f"SUMMARY:{_ics_text(summary)}", f"DESCRIPTION:{_ics_text(desc)}",
+                "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:Reminder", "TRIGGER:-PT0M", "END:VALARM",
+                "END:VEVENT"]
+
+    for r in sorted(wl["roles"], key=lambda r: r["key"]):
+        if r["status"] not in OPEN or r.get("kind") == "junior_watch" or not r.get("closing_date"):
+            continue
+        try:
+            close, at = parse_closing(r["closing_date"])
+        except ValueError:
+            continue
+        uid = hashlib.sha1(r["key"].encode()).hexdigest()[:16]  # stable per role, even if the date moves
+        at_s = f" {at:%H:%M}" if at else ""
+        if at:  # timed deadline: the event ends at the closing time
+            start = datetime.datetime.combine(close, at) - datetime.timedelta(hours=1)
+        else:   # date-only deadline: midday event
+            start = datetime.datetime.combine(close, noon)
+        board = " (date from job board)" if r.get("date_from_board") else ""
+        desc = f"{r['link']}\nStatus: {r['status'].replace('_', ' ')}{board}"
+        events += ev(f"{uid}-close", start, f"Closes{at_s}: {r['employer']} – {r['role']}", desc)
+        remind = close - datetime.timedelta(days=REMIND_DAYS)
+        if remind >= today:
+            events += ev(f"{uid}-remind", datetime.datetime.combine(remind, noon),
+                         f"Apply: {r['employer']} (closes {close:%a %d %b}{at_s})", desc)
+    return events
+
+
+def write_ics(wl, today):
+    lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//jobbot//EN", "CALSCALE:GREGORIAN",
+             "METHOD:PUBLISH", "X-WR-CALNAME:Jobbot deadlines", "X-WR-TIMEZONE:Europe/London",
+             "REFRESH-INTERVAL;VALUE=DURATION:PT6H", "X-PUBLISHED-TTL:PT6H",
+             *VTIMEZONE_LONDON, *ics_events(wl, today), "END:VCALENDAR"]
+    ICS.parent.mkdir(exist_ok=True)
+    tmp = ICS.with_suffix(".ics.tmp")
+    tmp.write_bytes(("\r\n".join(_fold(l) for l in lines) + "\r\n").encode())
+    os.chmod(tmp, 0o644)
+    os.replace(tmp, ICS)
 
 
 def _read_items(path):

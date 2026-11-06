@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""Turn new_roles.json into tailored CV/cover-letter .docx files and one .ics file,
-then mark those roles pack_ready in watchlist.json and rewrite tracker.md.
+"""Turn new_roles.json into tailored CV/cover-letter .docx files, then mark those roles
+pack_ready in watchlist.json and rewrite tracker.md and out/deadlines.ics.
 No AI here: it only copies the base documents and swaps in text the tailor step wrote."""
-import json, re, sys, datetime, pathlib
+import json, datetime, pathlib
 import docx
 import watchlist
-from watchlist import parse_closing
 
 ROOT = pathlib.Path(__file__).resolve().parent
 BASE, OUT = ROOT / "base", ROOT / "out"
@@ -68,45 +67,6 @@ def build_letter(role):
     return out
 
 
-def build_ics(roles, today):
-    def ev(uid, s, summary, desc):
-        e = s + datetime.timedelta(hours=1)  # one-hour event starting at s
-        return [
-            "BEGIN:VEVENT", f"UID:{uid}@jobbot", f"DTSTAMP:{today:%Y%m%d}T000000Z",
-            f"DTSTART;TZID=Europe/London:{s:%Y%m%dT%H%M%S}", f"DTEND;TZID=Europe/London:{e:%Y%m%dT%H%M%S}",
-            f"SUMMARY:{summary}", f"DESCRIPTION:{desc}",
-            "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:Reminder", "TRIGGER:-PT0M", "END:VALARM",
-            "END:VEVENT",
-        ]
-    lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//jobbot//EN", "CALSCALE:GREGORIAN"]
-    n = 0
-    for r in roles:
-        if not r.get("closing_date"):
-            continue
-        try:
-            close, at = parse_closing(r["closing_date"])
-        except ValueError:
-            print(f"Skipping .ics for {r.get('slug')}: bad closing_date {r['closing_date']!r}", file=sys.stderr)
-            continue
-        noon = datetime.time(12, 0)
-        if at:  # timed deadline: the event ends at the closing time
-            start, at_s = datetime.datetime.combine(close, at) - datetime.timedelta(hours=1), f" {at:%H:%M}"
-        else:  # date-only deadline: midday event
-            start, at_s = datetime.datetime.combine(close, noon), ""
-        lines += ev(f"{r['slug']}-close-{close}", start, f"Closes{at_s}: {r['employer']} – {r['role']}", r["link"])
-        remind = close - datetime.timedelta(days=4)
-        if remind >= today:
-            lines += ev(f"{r['slug']}-remind-{close}", datetime.datetime.combine(remind, noon),
-                        f"Apply: {r['employer']} (closes {close:%a %d %b}{at_s})", r["link"])
-        n += 1
-    lines.append("END:VCALENDAR")
-    if n:
-        out = OUT / f"Grad_Deadlines_{today}.ics"
-        out.write_text("\r\n".join(lines) + "\r\n")
-        return out
-    return None
-
-
 def main():
     today = datetime.date.today()
     roles = json.loads((ROOT / "new_roles.json").read_text() or "[]")
@@ -132,9 +92,6 @@ def main():
             made.append(notes)
     watchlist.save(wl)
     watchlist.render(wl, today)
-    ics = build_ics(roles, today)
-    if ics:
-        made.append(ics)
     for m in made:
         print(m.name)
 

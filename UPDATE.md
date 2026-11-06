@@ -8,7 +8,7 @@ ssh karlo@head01 'tar -xzf ~/jobbot-update.tar.gz -C /opt && chmod +x /opt/jobbo
 Your config.env, tracker.md and inbox.md are not touched.
 
 ## 1. Daily deadline reminders (no AI)
-On head01: `crontab -e`, add:
+Installed by `ansible/deploy.yml` (cron is versioned in the repo now – don't use `crontab -e`):
 ```
 13 8 * * * /usr/bin/python3 /opt/jobbot/reminders.py >> /opt/jobbot/logs/reminders.log 2>&1
 ```

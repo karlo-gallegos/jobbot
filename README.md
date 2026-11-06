@@ -27,10 +27,10 @@ Phone: install the ntfy app and subscribe to the same topic name.
 Test once by hand: `./run.sh && tail -n 40 logs/run-$(date +%F).log`
 
 Schedule (server timezone must be Europe/London: `sudo timedatectl set-timezone Europe/London`):
-```bash
-crontab -e
-31 18 * * 0 /opt/jobbot/run.sh >> /opt/jobbot/logs/cron.log 2>&1
-```
+`ansible/deploy.yml` installs both cron jobs for `karlo` (Sunday 18:31 `run.sh`, daily 08:13
+`reminders.py`) with `ansible.builtin.cron`, so the schedule is versioned. Change times there,
+not with `crontab -e`. On the first deploy it removes the old hand-added copies of those two lines
+(other crontab lines are left alone). Check with `crontab -l`.
 
 ## Seeing the files on your Mac
 Easiest: put `/opt/jobbot` on an Unraid share instead (e.g. mount `//tower/jobbot` on the node with CIFS/NFS and install there), then open the share in Finder. `out/` holds the CVs, letters and `deadlines.ics`.

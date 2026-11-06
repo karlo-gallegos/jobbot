@@ -1,5 +1,6 @@
 ---
-# Deploy jobbot code to /opt/jobbot. Never touches config.env, base/, out/, logs/ or data files.
+# Deploy jobbot code to /opt/jobbot and manage its two cron jobs (weekly run.sh, daily
+# reminders.py). Never touches config.env, base/, out/, data files or other cron lines.
 #   On head01:        ansible-playbook -i 'localhost,' -c local ansible/deploy.yml -K
 #   From the Mac:     ansible-playbook -i '100.122.249.103,' -u karlo ansible/deploy.yml -K
 - name: Deploy jobbot
@@ -51,3 +52,59 @@
       ansible.builtin.command: git -C {{ jobbot_home }} pull --ff-only origin {{ jobbot_branch }}
       register: jobbot_pull
       changed_when: "'Already up to date' not in jobbot_pull.stdout"
+
+    - name: Make sure logs/ exists (cron redirects into it)
+      become: true
+      ansible.builtin.file:
+        path: "{{ jobbot_home }}/logs"
+        state: directory
+        owner: "{{ jobbot_user }}"
+        mode: "0755"
+
+    # The two jobs used to be added by hand with `crontab -e`. Drop those unmanaged copies
+    # (a jobbot line not directly under an "#Ansible: jobbot ..." marker) so nothing runs twice.
+    - name: Find hand-added jobbot cron lines
+      become: true
+      become_user: "{{ jobbot_user }}"
+      ansible.builtin.shell: >-
+        set -o pipefail;
+        { crontab -l 2>/dev/null || true; } |
+        awk -v run="{{ jobbot_home }}/run.sh" -v rem="{{ jobbot_home }}/reminders.py"
+        '(index($0, run) || index($0, rem)) && $0 !~ /^[ \t]*#/ && prev !~ /^#Ansible: jobbot / { print } { prev = $0 }'
+      args:
+        executable: /bin/bash
+      register: jobbot_cron_unmanaged
+      changed_when: false
+      check_mode: false
+
+    - name: Remove hand-added jobbot cron lines (managed below)
+      become: true
+      become_user: "{{ jobbot_user }}"
+      ansible.builtin.shell: >-
+        set -o pipefail;
+        crontab -l |
+        awk -v run="{{ jobbot_home }}/run.sh" -v rem="{{ jobbot_home }}/reminders.py"
+        '(index($0, run) || index($0, rem)) && $0 !~ /^[ \t]*#/ && prev !~ /^#Ansible: jobbot / { prev = $0; next } { print; prev = $0 }' |
+        crontab -
+      args:
+        executable: /bin/bash
+      when: jobbot_cron_unmanaged.stdout | length > 0
+
+    - name: Weekly scan + tailor run (Sunday 18:31, Europe/London server time)
+      become: true
+      ansible.builtin.cron:
+        name: jobbot weekly run
+        user: "{{ jobbot_user }}"
+        weekday: "0"
+        hour: "18"
+        minute: "31"
+        job: "{{ jobbot_home }}/run.sh >> {{ jobbot_home }}/logs/cron.log 2>&1"
+
+    - name: Daily deadline reminders + 36h packs (08:13)
+      become: true
+      ansible.builtin.cron:
+        name: jobbot daily reminders
+        user: "{{ jobbot_user }}"
+        hour: "8"
+        minute: "13"
+        job: "/usr/bin/python3 {{ jobbot_home }}/reminders.py >> {{ jobbot_home }}/logs/reminders.log 2>&1"

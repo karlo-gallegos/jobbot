@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Daily deadline reminders. Reads watchlist.json and pings ntfy 3 days, 1 day and on the day
 of each closing date for roles not yet submitted (found / shortlisted / pack_ready; the junior
-watch list is excluded), and of each deadline / event mailwatch.py found in recruiter emails.
+watch list is excluded), and of each deadline / event mailwatch.py found in recruiter emails. At the end it copies
+watchlist.json, mail_events.json and inbox-archive.md to $SYNC_DIR/state/.
 
 Then, for up to MAX_PACKS roles per run (cron: once a day) closing within PACK_HOURS that have no pack yet, it runs the same
 tailor step as retailor.sh (claude -p prompts/tailor.md, TAILOR_MODEL) on that one role via
@@ -15,6 +16,7 @@ ROOT = pathlib.Path(__file__).resolve().parent
 ALERT_DAYS = {3: "in 3 days", 1: "TOMORROW", 0: "TODAY"}
 PACK_HOURS, MAX_PACKS = 36, 2
 PACK_FILE = "pack_role.json"
+STATE_FILES = ("watchlist.json", "mail_events.json", "inbox-archive.md")  # backed up to SYNC_DIR/state/
 
 
 def config():
@@ -101,6 +103,23 @@ def build_pack(r, cfg, today):
                          else f"Tailor wrote nothing for {r['employer']} – {r['role']} – see logs/{log.name}")
 
 
+def backup_state(cfg):
+    """Copy the run state to $SYNC_DIR/state/ (daily here, weekly from run.sh). Quietly does
+    nothing if SYNC_DIR is unset or not mounted."""
+    sync = cfg.get("SYNC_DIR")
+    if not sync or not pathlib.Path(sync).is_dir():
+        return
+    files = [str(ROOT / f) for f in STATE_FILES if (ROOT / f).exists()]
+    if not files:
+        return
+    dest = pathlib.Path(sync) / "state"
+    try:
+        dest.mkdir(exist_ok=True)
+        subprocess.run(["rsync", "-t", *files, f"{dest}/"], check=True, timeout=120)
+    except (OSError, subprocess.SubprocessError) as e:
+        print(f"state backup failed: {e}", file=sys.stderr)
+
+
 def main():
     now = datetime.datetime.now()
     today = now.date()
@@ -136,6 +155,8 @@ def main():
         print(msg)
         notify(cfg, msg, "Jobbot pack" if ok else "Jobbot pack failed")
         wl = watchlist.load(today)  # build_docs.py updated it
+
+    backup_state(cfg)
 
 
 if __name__ == "__main__":

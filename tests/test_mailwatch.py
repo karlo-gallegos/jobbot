@@ -303,6 +303,20 @@ class MailwatchTest(unittest.TestCase):
             self.assertEqual(wl_mod.process_inbox(wl, today)[0].split(" →")[0], "WAITING: done SONI")
             self.assertEqual((self.tmp / "inbox.md").read_text(), "done SONI\n")
 
+    def test_state_backup(self):
+        rem = sys.modules["reminders"]
+        nas = self.tmp / "nas"
+        rem.backup_state({"SYNC_DIR": str(nas)})          # not mounted: quietly nothing
+        self.assertFalse(nas.exists())
+        rem.backup_state({})                               # no SYNC_DIR: nothing
+        nas.mkdir()
+        self.mw.main(["--eml", str(self.box)])             # writes mail_events.json
+        rem.backup_state({"SYNC_DIR": str(nas)})
+        self.assertEqual(sorted(f.name for f in (nas / "state").iterdir()),
+                         ["mail_events.json", "watchlist.json"])   # no inbox-archive.md yet: skipped
+        self.assertEqual((nas / "state" / "watchlist.json").read_text(),
+                         (self.tmp / "watchlist.json").read_text())
+
     def test_model_failure_still_pings_subjects(self):
         (self.tmp / "claude_stub.py").write_text("#!/usr/bin/env python3\nimport sys\nsys.exit(1)\n")
         self.mw.main(["--eml", str(self.box)])

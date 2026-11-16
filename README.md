@@ -35,6 +35,10 @@ not with `crontab -e`. On the first deploy it removes the old hand-added copies 
 ## Seeing the files on your Mac
 Easiest: put `/opt/jobbot` on an Unraid share instead (e.g. mount `//tower/jobbot` on the node with CIFS/NFS and install there), then open the share in Finder. `out/` holds the CVs, letters and `deadlines.ics`.
 
+Backup: if `SYNC_DIR` is mounted, `reminders.py` (daily) and `run.sh` (weekly) also copy
+`watchlist.json`, `mail_events.json` and `inbox-archive.md` to `$SYNC_DIR/state/` – the role list
+and mail state are not in git. To restore, copy them back into `/opt/jobbot`.
+
 ## Deadlines in Apple Calendar (subscribe once)
 `out/deadlines.ics` is one stable feed: a "Closes" event (ending at the closing time if the listing
 gives one, else midday) and an "Apply" reminder 4 days before, for every role not yet submitted.

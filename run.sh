@@ -43,6 +43,8 @@ FILES="$(python3 build_docs.py 2>>"$LOG" | tr '\n' ' ')"
 if [ -n "${SYNC_DIR:-}" ] && [ -d "$SYNC_DIR" ]; then
   rsync -rt out/ "$SYNC_DIR/" && cp tracker.md "$SYNC_DIR/tracker.md" || echo "sync failed" >> "$LOG"
 fi
+# Back up watchlist.json, mail_events.json, inbox-archive.md to $SYNC_DIR/state/ (skips if not mounted)
+python3 -c 'import reminders as r; r.backup_state(r.config())' >> "$LOG" 2>&1 || echo "state backup failed" >> "$LOG"
 
 MSG="$(cat summary.txt 2>/dev/null || echo 'Scan finished.')"
 [ -n "$FILES" ] && MSG="$MSG

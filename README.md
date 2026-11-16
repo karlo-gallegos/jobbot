@@ -68,6 +68,9 @@ Every 2 hours (08:07–22:07) it reads new Gmail over IMAP and looks for emails 
   to (with alerts the day before and shortly before), and to ntfy straight away – tapping the
   ping opens the email in Gmail. Something already overdue is flagged **OVERDUE**.
   `reminders.py` pings these at 3 days / tomorrow / today too.
+- If the email is an interview / assessment invite, a rejection or an offer for a role in
+  `watchlist.json`, the ping suggests the inbox line to send, e.g. `→ log it: interview SONI`.
+  It only suggests – mail never changes `watchlist.json`.
 - It never replies, sends, deletes or marks anything read. Optional `MAIL_LABEL` adds a Gmail label.
 - If a run fails (IMAP down, app password revoked, crash) you get a high-priority ping
   "Jobbot mail watch failed: …" – at most one per 12 hours. The Sunday summary ends with

@@ -4,7 +4,7 @@ Between the <emails> tags is a JSON array of recent emails to Karlo that a filte
 
 For each email, work out whether Karlo has to do something, or be somewhere at a set time, because of a job or graduate application, an assessment or interview, or a form from an employer or agency he works for. Return one object per item:
 
-{"id": str (copied from the email), "relevant": bool, "kind": "deadline" | "event" | "action" | "info", "employer": str, "title": str, "due": str or null, "end": str or null, "action": str, "links": [str], "evidence": str}
+{"id": str (copied from the email), "relevant": bool, "kind": "deadline" | "event" | "action" | "info", "employer": str, "title": str, "due": str or null, "end": str or null, "action": str, "links": [str], "evidence": str, "outcome": "interview" | "rejected" | "offer" | null}
 
 - relevant: false for job alerts, "jobs you may like", newsletters, marketing, receipts, account or security notices, and anything else that needs nothing from him. The other fields can then be empty.
 - kind:
@@ -19,3 +19,4 @@ For each email, work out whether Karlo has to do something, or be somewhere at a
 - action: at most 200 characters: exactly what to do and where, e.g. "Reply to this email to confirm you can attend" or "Complete the Cammio video interview in Chrome (camera and mic needed)".
 - links: up to 3 URLs, copied character for character from the email, that he needs for this item (start, booking, form or meeting links). Never invent or edit a URL. Use [] if there is none.
 - evidence: the exact words from the email that state the date and time you used (at most 120 characters), or "" if due is null.
+- outcome: what this email means for his application: "interview" if it invites him to an interview, assessment day, video interview or online test; "rejected" if it says his application was unsuccessful or will not go further; "offer" if it offers him the job. Otherwise null (also for "application received" and reminders about something already known).

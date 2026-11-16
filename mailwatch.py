@@ -29,6 +29,7 @@ event = {"uid": stable id, "msg": message id, "kind": "deadline" | "event" | "ac
          "employer", "title", "action", "due": "YYYY-MM-DD[THH:MM]" | null,
          "end": "YYYY-MM-DDTHH:MM" | null, "checked": bool (date found word-for-word in the email),
          "links": [urls from the email], "from", "subject", "received", "thread_url", "found",
+         "outcome": "interview" | "rejected" | "offer" | null (only used to suggest an inbox line),
          "done": true once Karlo sends "done <employer> [title words]" via inbox.md}
 Set JOBBOT_CLAUDE to override the claude command (tests use a stub).
 """
@@ -46,6 +47,7 @@ MAX_EMAILS = 15        # per model call
 MAX_BODY = 6000        # characters of each email sent to the model
 KEEP_DAYS = 30         # drop events this long after they are due / found
 KINDS = ("deadline", "event", "action", "info")
+OUTCOMES = ("interview", "rejected", "offer")  # suggested as "→ log it: <outcome> <employer>"
 ERROR_PING_HOURS = 12  # at most one "mail watch failed" ping this often
 STALE_HOURS = 6        # run.sh summary: older last_ok = not running
 
@@ -405,7 +407,8 @@ def validate(raw, items, today):
              "action": re.sub(r"\s+", " ", str(r.get("action") or ""))[:240], "due": due, "end": end,
              "checked": bool(due and ev_txt and ev_txt in body), "links": links, "msg": src["id"],
              "from": src["from"], "subject": src["subject"][:150], "received": src["received"],
-             "thread_url": src["thread_url"], "found": str(today)}
+             "thread_url": src["thread_url"], "found": str(today),
+             "outcome": r.get("outcome") if r.get("outcome") in OUTCOMES else None}
         e["uid"] = hashlib.sha1(f"{src['id']}|{kind}|{due}|{title.lower()}".encode()).hexdigest()[:16]
         if e["uid"] not in seen:
             seen.add(e["uid"])
@@ -424,11 +427,24 @@ def _due_dt(e):
     return datetime.datetime.combine(day, at or datetime.time(23, 59))
 
 
-def message(new, now):
+def suggest_line(e, wl):
+    """The inbox.md line Karlo would send for this email ("interview SONI"), or None. Only a
+    suggestion: mail never changes watchlist.json."""
+    if not e.get("outcome") or not e.get("employer") or not wl:
+        return None
+    name = re.sub(r"\s+", " ", e["employer"]).strip()
+    # Same lookup apply_line does for interview / rejected / offer, so the line will apply as is.
+    found = watchlist.match_roles(wl, name, "applied")
+    if len(found) != 1 or found[0].get("outcome") == e["outcome"]:
+        return None  # no role, ambiguous, or already logged
+    return f"{e['outcome']} {name}"
+
+
+def message(new, now, wl=None):
     """ntfy text + priority + click URL for the new events (most urgent first)."""
     def rank(e):
         return (_due_dt(e) if e.get("due") else datetime.datetime.max, KINDS.index(e["kind"]))
-    lines, prio = [], 2
+    lines, prio, suggested = [], 2, set()
     for e in sorted(new, key=rank):
         check = "" if e["checked"] or not e.get("due") else " (check date)"
         if e["kind"] in ("deadline", "event") and e.get("due"):
@@ -444,6 +460,10 @@ def message(new, now):
             lines.append(f"FYI: {e['title']}")
         if e["action"] and e["kind"] != "info":
             lines.append(f"  → {e['action']}")
+        hint = suggest_line(e, wl)
+        if hint and hint not in suggested:
+            suggested.add(hint)
+            lines.append(f"  → log it: {hint}")
     text = "\n".join(lines)
     if len(text.encode()) > 3800:
         text = text.encode()[:3800].decode(errors="ignore") + "\n…"
@@ -542,7 +562,8 @@ def check_mail(args, cfg, now):
             print(f"{now:%F %H:%M}: no new mail")
             return
         heads = box.headers(uids)
-        employers = employer_names(watchlist.load(today))
+        wl = watchlist.load(today)
+        employers = employer_names(wl)
         known = {e["msg"] for e in st["events"]}
         picked = []
         for h in heads:
@@ -589,7 +610,7 @@ def check_mail(args, cfg, now):
         save_state(st)
         if new:
             watchlist.write_ics(watchlist.load(today), today)
-            text, prio, click = message(new, now)
+            text, prio, click = message(new, now, wl)
             ping(cfg, "Jobbot mail", text, prio, click)
             if label:
                 box.label([i["imap_uid"] for i in items if i["id"] in {e["msg"] for e in new}], label)

@@ -242,6 +242,44 @@ class MailwatchTest(unittest.TestCase):
         self.assertEqual(self.pings, [])
         self.assertFalse((self.tmp / "mail_events.json").exists())
 
+    def test_done_inbox_verb(self):
+        import datetime, fcntl
+        self.mw.main(["--eml", str(self.box)])
+        wl_mod = self.mw.watchlist
+        today = datetime.date(2026, 11, 10)
+        (self.tmp / "inbox.md").write_text("done Kainos\ndone Kainos confirm\ndone Mint\ndone Nobody\n")
+        wl = wl_mod.load(today)
+        msgs = wl_mod.process_inbox(wl, today)
+        self.assertTrue(msgs[0].startswith("NOT APPLIED: done Kainos → 'Kainos' matches 3 mail items"), msgs)
+        self.assertEqual(msgs[1], "done Kainos confirm → done: Confirm attendance at Kainos assessment")
+        self.assertEqual(msgs[2], "done Mint → done: Fill in HMRC New Starter checklist (Mint)")
+        self.assertIn("no open mail item matches 'Nobody'", msgs[3])
+        inbox = (self.tmp / "inbox.md").read_text().splitlines()
+        self.assertEqual(len(inbox), 2)
+        self.assertTrue(all(l.startswith("# NOT APPLIED") for l in inbox), inbox)
+        self.assertIn("done Kainos confirm", (self.tmp / "inbox-archive.md").read_text())
+
+        ev = {e["title"]: e for e in json.loads((self.tmp / "mail_events.json").read_text())["events"]}
+        self.assertTrue(ev["Confirm attendance at Kainos assessment"]["done"])
+        self.assertNotIn("done", ev["Kainos interview (Teams)"])
+        wl_mod.render(wl, today)
+        ics = (self.tmp / "out" / "deadlines.ics").read_text()
+        self.assertNotIn("Confirm attendance", ics)
+        self.assertNotIn("HMRC", ics)
+        self.assertIn("Kainos interview (Teams)", ics)
+        alerts = self.mw.upcoming_alerts(datetime.date(2026, 11, 10), {1: "TOMORROW"})
+        self.assertEqual(alerts, [])   # the Kainos confirm and Mint form were due on the 11th, both done
+
+        # Mail watch running: the line waits in inbox.md instead of being commented out.
+        with open(self.tmp / "mail_events.lock", "w") as lk:
+            fcntl.flock(lk, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            ok, msg = self.mw.mark_done("SONI", today, wait=0)
+            self.assertIsNone(ok)
+            self.mw.mark_done = lambda name, today: (None, "mail watch is running – will retry")
+            (self.tmp / "inbox.md").write_text("done SONI\n")
+            self.assertEqual(wl_mod.process_inbox(wl, today)[0].split(" →")[0], "WAITING: done SONI")
+            self.assertEqual((self.tmp / "inbox.md").read_text(), "done SONI\n")
+
     def test_model_failure_still_pings_subjects(self):
         (self.tmp / "claude_stub.py").write_text("#!/usr/bin/env python3\nimport sys\nsys.exit(1)\n")
         self.mw.main(["--eml", str(self.box)])

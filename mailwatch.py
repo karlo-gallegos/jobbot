@@ -28,11 +28,12 @@ mail_events.json = {"version": 1, "uidvalidity": int, "last_uid": int, "events":
 event = {"uid": stable id, "msg": message id, "kind": "deadline" | "event" | "action" | "info",
          "employer", "title", "action", "due": "YYYY-MM-DD[THH:MM]" | null,
          "end": "YYYY-MM-DDTHH:MM" | null, "checked": bool (date found word-for-word in the email),
-         "links": [urls from the email], "from", "subject", "received", "thread_url", "found"}
+         "links": [urls from the email], "from", "subject", "received", "thread_url", "found",
+         "done": true once Karlo sends "done <employer> [title words]" via inbox.md}
 Set JOBBOT_CLAUDE to override the claude command (tests use a stub).
 """
 import argparse, datetime, email, email.policy, email.utils, fcntl, hashlib, html.parser, imaplib
-import json, os, pathlib, re, subprocess, sys, zoneinfo
+import json, os, pathlib, re, subprocess, sys, time, zoneinfo
 import watchlist
 from reminders import config, notify
 
@@ -95,7 +96,7 @@ def upcoming_alerts(today, alert_days):
     """(days, text) for deadline/event items due in one of alert_days – used by reminders.py."""
     out = []
     for e in events():
-        if e["kind"] not in ("deadline", "event") or not e.get("due"):
+        if e["kind"] not in ("deadline", "event") or not e.get("due") or e.get("done"):
             continue
         try:
             day, at = watchlist.parse_closing(e["due"])
@@ -107,6 +108,55 @@ def upcoming_alerts(today, alert_days):
             verb = "due" if e["kind"] == "deadline" else "at"
             out.append((days, f"{e['title']} – {verb} {alert_days[days]} ({when})"))
     return out
+
+
+def match_events(evs, name, today):
+    """Open (not done, not long past) events matching '<employer> [title words]', like
+    watchlist.match_roles: employer first, then words from the title. Best matches only."""
+    want = watchlist._words(name)
+    scored = []
+    for e in evs:
+        if e.get("done") or e["kind"] == "info" or (e.get("due") or "9999")[:10] < str(today - datetime.timedelta(days=1)):
+            continue
+        emp, title = watchlist._words(e.get("employer", "")), watchlist._words(e["title"])
+        if not want:
+            continue
+        if emp and want[:len(emp)] == emp:
+            rest = want[len(emp):]
+            if rest and not set(rest) <= set(title):
+                continue
+            score = 10 + len(rest)
+        elif " ".join(want) in " ".join(emp + title):  # e.g. "Mint" for "Mint People"
+            score = 1
+        else:
+            continue
+        scored.append((score, e))
+    best = max((sc for sc, _ in scored), default=None)
+    return [e for sc, e in scored if sc == best]
+
+
+def mark_done(name, today, wait=30):
+    """inbox.md "done <employer> [title words]". Returns (ok, message); ok is None if a mail watch
+    run is active for longer than `wait` seconds – the line then stays in inbox.md for later."""
+    with open(LOCK, "a") as lk:
+        for _ in range(wait + 1):
+            try:
+                fcntl.flock(lk, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                time.sleep(1)
+        else:
+            return None, "mail watch is running – will retry"
+        st = load_state()
+        found = match_events(st["events"], name, today)
+        if not found:
+            return False, f"no open mail item matches {name!r}"
+        if len(found) > 1:
+            opts = "; ".join(e["title"] for e in found[:4])
+            return False, f"{name!r} matches {len(found)} mail items ({opts}) – add words from the title"
+        found[0]["done"] = True
+        save_state(st)
+        return True, f"done: {found[0]['title']}"
 
 
 # ---------- reading mail ----------

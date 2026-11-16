@@ -6,7 +6,8 @@
                                          new_roles.json), then write tracker.md
   python3 watchlist.py inbox             apply inbox.md lines (applied / interview / rejected /
                                          offer / withdrawn / skip / shortlist <employer> [role]
-                                         [date]), move them to inbox-archive.md, write tracker.md
+                                         [date]; done <employer> [title words] for a mail item),
+                                         move them to inbox-archive.md, write tracker.md
 
 watchlist.json = {"version": 1, "last_scan": "YYYY-MM-DD", "roles": [role, ...]}
 role = {"key": normalised link, "link", "employer", "role", "location",
@@ -230,10 +231,14 @@ def match_roles(wl, name, prefer):
 
 
 def apply_line(wl, line, today):
-    """Apply one inbox line. Returns (done, message)."""
+    """Apply one inbox line. Returns (ok, message); ok None = try again later (line stays)."""
     verb, _, rest = line.strip().partition(" ")
+    if verb.lower() == "done" and rest.strip():  # a mail deadline / event / to-do is dealt with
+        import mailwatch  # here, not at the top: mailwatch imports this module
+        return mailwatch.mark_done(rest.strip(), today)
     if verb.lower() not in VERBS or not rest.strip():
-        return False, "not understood (start with applied / interview / rejected / offer / withdrawn / skip / shortlist)"
+        return False, ("not understood (start with applied / interview / rejected / offer / withdrawn / "
+                       "skip / shortlist / done)")
     status, outcome, prefer = VERBS[verb.lower()]
     name = DATE_TAIL.sub("", rest).strip()
     detail = rest[len(name):].strip()
@@ -273,7 +278,10 @@ def process_inbox(wl, today):
                 keep.append(line)
                 continue
             ok, msg = apply_line(wl, line, today)
-            if ok:
+            if ok is None:  # busy (mail watch running): leave the line for the next run
+                msgs.append(f"WAITING: {line.strip()} → {msg}")
+                keep.append(line)
+            elif ok:
                 msgs.append(f"{line.strip()} → {msg}")
                 done.append(f"{today} {line.strip()} → {msg}")
             else:  # commented out so it never applies itself later by elimination
@@ -507,7 +515,7 @@ def mail_ics_events(today):
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     events = []
     for e in sorted(items, key=lambda e: e["uid"]):
-        if e.get("kind") not in ("deadline", "event") or not e.get("due"):
+        if e.get("kind") not in ("deadline", "event") or not e.get("due") or e.get("done"):
             continue
         try:
             day, at = parse_closing(e["due"])

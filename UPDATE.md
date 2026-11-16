@@ -33,9 +33,9 @@ On the Mac: Finder → Go → Connect to Server → `smb://UNRAID-IP/jobbot` (ti
 ## 3. One-tap inbox updates from your iPhone (no AI)
 Needs the Tailscale app on the iPhone, signed in to the same account.
 In the Shortcuts app → + → name it "Jobbot":
-1. **List** action: `applied`, `rejected`, `interview`, `skip`
+1. **List** action: `applied`, `rejected`, `interview`, `skip`, `done`
 2. **Choose from List** (prompt: "Update")
-3. **Ask for Input** → Text, prompt: "Employer (add date for interviews)"
+3. **Ask for Input** → Text, prompt: "Employer (add date for interviews; for done: words from the mail item)"
 4. **Run Script Over SSH**
    - Host: `head01` · Port: `22` · User: `karlo`
    - Authentication: **SSH Key** → tap the key → **Share Public Key** → copy it

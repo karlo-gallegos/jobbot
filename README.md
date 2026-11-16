@@ -92,6 +92,7 @@ applied CGI
 rejected Citi
 interview TD Securities 20 Nov
 skip Version 1
+done Kainos confirm
 ```
 Verbs: `applied` → submitted · `interview` / `rejected` / `offer` / `withdrawn` → outcome ·
 `skip` → outcome: skipped · `shortlist` → shortlisted. Then the employer name, then (if the employer
@@ -99,6 +100,10 @@ has more than one role) words from the role title, e.g. `applied CGI cloud`. A t
 kept as a note. Applied lines move to `inbox-archive.md`; a line that matches no role or several
 roles is commented out in `inbox.md` with the reason (`# NOT APPLIED …`) – send it again, more specific.
 `applied X` for a role the scan never found adds it to the list.
+`done <employer> [words from the title]` ticks off a deadline / event / to-do that `mailwatch.py`
+found in an email (e.g. `done Kainos confirm` for "Confirm attendance at Kainos assessment"): it
+leaves the calendar feed and the daily reminders. Matching works like the other verbs – a line
+that fits several mail items is commented out so you can add a title word.
 
 ## Usage / cost
 - Scan on Haiku and tailor on Sonnet keeps usage low; change models in `config.env`.

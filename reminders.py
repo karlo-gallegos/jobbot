@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Daily deadline reminders. Reads watchlist.json and pings ntfy 3 days, 1 day and on the day
 of each closing date for roles not yet submitted (found / shortlisted / pack_ready; the junior
-watch list is excluded).
+watch list is excluded), and of each deadline / event mailwatch.py found in recruiter emails.
 
 Then, for up to MAX_PACKS roles per run (cron: once a day) closing within PACK_HOURS that have no pack yet, it runs the same
 tailor step as retailor.sh (claude -p prompts/tailor.md, TAILOR_MODEL) on that one role via
@@ -120,6 +120,8 @@ def main():
         if days in ALERT_DAYS:
             when = f"{close:%a %d %b}" + (f" {at:%H:%M}" if at else "")
             alerts.append(f"{r['employer']} closes {ALERT_DAYS[days]} ({when}) – {r['role']}")
+    import mailwatch  # here, not at the top: mailwatch imports this module
+    alerts += [text for _, text in sorted(mailwatch.upcoming_alerts(today, ALERT_DAYS))]
     if alerts:
         notify(cfg, "\n".join(alerts), "Jobbot deadline", Priority="high", Tags="alarm_clock")
         print(f"{today}: sent {len(alerts)} reminder(s)")

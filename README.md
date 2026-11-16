@@ -51,6 +51,35 @@ iPhone: Settings → Calendar → Accounts → Add Account → Other → Add Sub
 Devices need Tailscale connected to refresh. Old `Grad_Deadlines_*.ics` files are no longer written;
 delete any you imported into Calendar so events aren't doubled.
 
+## Recruiter emails → calendar + phone (`mailwatch.py`)
+Every 2 hours (08:07–22:07) it reads new Gmail over IMAP and looks for emails that need you:
+"confirm by…", video interviews, online tests, forms, interview and assessment times.
+- **Plain-Python filter first** (no AI): ignores job alerts and newsletters (LinkedIn, Indeed,
+  targetjobs, NIJobs, Up2staff, ESB alerts…), keeps mail from application/assessment platforms
+  (Workday, Candidate Manager/Cammio, HireVue, Aon, Oleeo…), from employers you've shortlisted
+  or applied to in `watchlist.json`, from `MAIL_EXTRA_SENDERS`, or with words like
+  "interview", "assessment", "response required", "deadline", "form" in the subject.
+  Most runs stop here and use nothing.
+- **Then one Haiku call** (`MAIL_MODEL`, no tools) for whatever is left, turning each email into
+  a deadline, event, to-do or FYI. Python checks it: dates must parse and be plausible, links
+  must be copied from the email, and a date that isn't found word-for-word in the email is
+  marked "(check date)". If the call fails you still get a ping listing the emails by subject.
+- Results go to `mail_events.json`, into the same `out/deadlines.ics` feed you already subscribe
+  to (with alerts the day before and shortly before), and to ntfy straight away – tapping the
+  ping opens the email in Gmail. Something already overdue is flagged **OVERDUE**.
+  `reminders.py` pings these at 3 days / tomorrow / today too.
+- It never replies, sends, deletes or marks anything read. Optional `MAIL_LABEL` adds a Gmail label.
+
+Setup on head01 (once):
+1. Google Account → Security → 2-Step Verification on → **App passwords** → create one
+   called "jobbot". Put `MAIL_USER` and `MAIL_APP_PASSWORD` in `config.env` (`chmod 600 config.env`).
+2. Dry run over the last 2 weeks: `python3 mailwatch.py --since 14 --dry-run`
+3. Real first run: `python3 mailwatch.py --since 14` (later runs carry on from where it stopped).
+4. Deploy cron: `ansible/deploy.yml`.
+
+Check `claude --help` still lists `--tools` and `--strict-mcp-config` (used to run the mail
+step with no tools at all). Log: `logs/mail.log`.
+
 ## Telling it about updates
 Edit `inbox.md` from anywhere (Finder via the share, or SSH over Tailscale):
 ```
@@ -88,6 +117,6 @@ don't edit it by hand. `reminders.py` reads `watchlist.json`. The first run afte
 imports the old hand-kept `tracker.md` and keeps a copy as `tracker-pre-watchlist.md`;
 check the generated `tracker.md` against it once. Rebuild by hand: `python3 watchlist.py render`.
 
-Git holds code only. `config.env`, `base/`, `facts.md`, `new_roles*.json`, `watchlist.json`, `scan_results.json`, `tracker.md`,
+Git holds code only. `config.env`, `base/`, `facts.md`, `new_roles*.json`, `watchlist.json`, `scan_results.json`, `mail_events.json`, `tracker.md`,
 `inbox*.md`, `summary.txt`, `out/` and `logs/` are git-ignored and stay on head01 / NAS.
 Scope and rules (for the cron runs and for code changes): `CLAUDE.md`. Planned work: `docs/first-issues.md` / GitHub issues.

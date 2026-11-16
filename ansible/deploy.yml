@@ -1,6 +1,7 @@
 ---
-# Deploy jobbot code to /opt/jobbot and manage its two cron jobs (weekly run.sh, daily
-# reminders.py). Never touches config.env, base/, out/, data files or other cron lines.
+# Deploy jobbot code to /opt/jobbot and manage its cron jobs (weekly run.sh, daily
+# reminders.py, 2-hourly mailwatch.py). Never touches config.env, base/, out/, data files or
+# other cron lines.
 #   On head01:        ansible-playbook -i 'localhost,' -c local ansible/deploy.yml -K
 #   From the Mac:     ansible-playbook -i '100.122.249.103,' -u karlo ansible/deploy.yml -K
 - name: Deploy jobbot
@@ -108,3 +109,12 @@
         hour: "8"
         minute: "13"
         job: "/usr/bin/python3 {{ jobbot_home }}/reminders.py >> {{ jobbot_home }}/logs/reminders.log 2>&1"
+
+    - name: Recruiter-email watch (every 2 hours, 08:07–22:07)
+      become: true
+      ansible.builtin.cron:
+        name: jobbot mail watch
+        user: "{{ jobbot_user }}"
+        hour: "8-22/2"
+        minute: "7"
+        job: "/usr/bin/python3 {{ jobbot_home }}/mailwatch.py >> {{ jobbot_home }}/logs/mail.log 2>&1"

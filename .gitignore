@@ -12,6 +12,9 @@ watchlist.json
 watchlist.json.tmp
 scan_results.json
 pack_role.json
+mail_events.json
+mail_events.json.tmp
+mail_events.lock
 tracker.md
 tracker.md.tmp
 tracker-pre-watchlist.md

@@ -28,6 +28,7 @@ WATCHLIST, TRACKER = ROOT / "watchlist.json", ROOT / "tracker.md"
 TRACKER_BACKUP = ROOT / "tracker-pre-watchlist.md"
 INBOX, INBOX_ARCHIVE = ROOT / "inbox.md", ROOT / "inbox-archive.md"
 ICS = ROOT / "out" / "deadlines.ics"   # one stable feed; Apple Calendar subscribes to it
+MAIL_EVENTS = ROOT / "mail_events.json"  # written by mailwatch.py; its dated items join the feed
 REMIND_DAYS = 4
 OPEN = ("found", "shortlisted", "pack_ready")
 WATCH_ROWS = 12
@@ -497,11 +498,60 @@ def ics_events(wl, today):
     return events
 
 
+def mail_ics_events(today):
+    """Deadlines and events that mailwatch.py found in recruiter emails (mail_events.json)."""
+    try:
+        items = json.loads(MAIL_EVENTS.read_text())["events"]
+    except (OSError, ValueError, KeyError):
+        return []
+    stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    events = []
+    for e in sorted(items, key=lambda e: e["uid"]):
+        if e.get("kind") not in ("deadline", "event") or not e.get("due"):
+            continue
+        try:
+            day, at = parse_closing(e["due"])
+        except ValueError:
+            continue
+        if day < today - datetime.timedelta(days=1):
+            continue
+        check = "" if e.get("checked") else " (check date)"
+        if e["kind"] == "event":
+            start = datetime.datetime.combine(day, at or datetime.time(9, 0))
+            try:
+                end = datetime.datetime.combine(*parse_closing(e["end"])) if e.get("end") else None
+            except (ValueError, TypeError):
+                end = None
+            end = end if end and end > start else start + datetime.timedelta(hours=1)
+            summary, alarms = f"{e['title']}{check}", ("-P1D", "-PT30M")
+        elif at:  # timed deadline: the event ends at the deadline
+            end = datetime.datetime.combine(day, at)
+            start = end - datetime.timedelta(minutes=30)
+            summary, alarms = f"Due {at:%H:%M}: {e['title']}{check}", ("-P1D", "-PT3H")
+        else:     # date-only deadline: morning slot so it's seen early
+            start = datetime.datetime.combine(day, datetime.time(9, 0))
+            end = start + datetime.timedelta(minutes=30)
+            summary, alarms = f"Due: {e['title']}{check}", ("-P1D", "-PT0M")
+        desc = "\n".join(x for x in [e.get("action"), *e.get("links", []),
+                                     f"Email: {e['subject']} – {e['from']} ({e['received'][:10]})",
+                                     e.get("thread_url")] if x)
+        events += ["BEGIN:VEVENT", f"UID:mail-{e['uid']}@jobbot", f"DTSTAMP:{stamp}",
+                   f"DTSTART;TZID=Europe/London:{start:%Y%m%dT%H%M%S}",
+                   f"DTEND;TZID=Europe/London:{end:%Y%m%dT%H%M%S}",
+                   f"SUMMARY:{_ics_text(summary)}", f"DESCRIPTION:{_ics_text(desc)}"]
+        if e.get("thread_url"):
+            events.append(f"URL:{e['thread_url']}")
+        for trig in alarms:
+            events += ["BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:Reminder", f"TRIGGER:{trig}", "END:VALARM"]
+        events.append("END:VEVENT")
+    return events
+
+
 def write_ics(wl, today):
     lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//jobbot//EN", "CALSCALE:GREGORIAN",
              "METHOD:PUBLISH", "X-WR-CALNAME:Jobbot deadlines", "X-WR-TIMEZONE:Europe/London",
              "REFRESH-INTERVAL;VALUE=DURATION:PT6H", "X-PUBLISHED-TTL:PT6H",
-             *VTIMEZONE_LONDON, *ics_events(wl, today), "END:VCALENDAR"]
+             *VTIMEZONE_LONDON, *ics_events(wl, today), *mail_ics_events(today), "END:VCALENDAR"]
     ICS.parent.mkdir(exist_ok=True)
     tmp = ICS.with_suffix(".ics.tmp")
     tmp.write_bytes(("\r\n".join(_fold(l) for l in lines) + "\r\n").encode())

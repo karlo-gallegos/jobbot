@@ -4,15 +4,19 @@ You are running unattended on Karlo's Debian server to manage his 2027 graduate 
 Keep usage LOW: Karlo needs his Claude allowance for university work. Do only what the current prompt asks.
 
 ## Scope (fixed – do not expand)
-The bot does exactly four things:
+The bot does exactly five things:
 1. **Find** – scan job boards for 2027 graduate and entry-level roles on the island of Ireland.
 2. **Shortlist** – present new roles to Karlo (`tracker.md`, `summary.txt`); he decides what goes forward.
 3. **Build pack** – tailored CV Profile + cover letter for a role.
 4. **Remind** – ntfy alerts and the `deadlines.ics` feed, including deadlines, interviews and to-dos
    that `mailwatch.py` finds in recruiter emails.
+5. **Interview prep** – when Karlo logs an interview (`interview <employer> …` via `inbox_add.sh`),
+   one `out/Interview_Prep_<Employer>.md` (`prep.sh`, `prompts/prep.md`): what the programme is,
+   likely questions with 1-line STAR outlines pointing at facts from `facts.md`, topics to revise,
+   questions to ask, process notes. Outlines only – never scripted answers.
 
-Karlo does: own-words answers, pressing Submit, interviews. If a prompt seems to need anything
-outside these four, don't do it – say so in `summary.txt`.
+Karlo does: own-words answers, pressing Submit, the interviews themselves. If a prompt seems to need
+anything outside these five, don't do it – say so in `summary.txt`.
 
 ## Hard rules
 - Never apply, sign in, create accounts, enter passwords, or submit anything. Karlo does those.
@@ -53,7 +57,7 @@ outside these four, don't do it – say so in `summary.txt`.
 - `/opt/jobbot` on head01 is a git checkout. Change the repo, then `git pull --ff-only` there
   (or `ansible/deploy.yml`, which also manages cron). Never hand-edit tracked files in `/opt/jobbot`.
 - Keep the flat layout and script paths – cron and the iPhone Shortcut call them.
-- Anything outside the four-part scope becomes a GitHub issue labelled `later`; don't build it.
+- Anything outside the five-part scope becomes a GitHub issue labelled `later`; don't build it.
 - Small changes, one issue per change; reference the issue number in the commit.
 - Test against a mock role / mock watchlist in a temp dir (stub `claude` via `JOBBOT_CLAUDE`)
   before any live `claude -p` run.

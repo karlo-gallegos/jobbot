@@ -28,3 +28,4 @@ Opened and fixed on 6 Nov 2026 as #1–#7 (items 0–6). Item 7 not opened yet (
 6. **[bot] Merge `docs/scope.md` into the live CLAUDE.md** (done; draft removed) used by the `claude -p` runs.
 7. **[later] Interview prep packs (`prep.sh`)** – exists already, but interviews sit on
    Karlo's side of the scope line. Decide: keep as-is, or park.
+   **Decided 16 Nov 2026 (#16): keep** – now scope item 5 in CLAUDE.md.

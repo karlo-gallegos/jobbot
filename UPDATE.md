@@ -23,11 +23,15 @@ sudo apt install -y cifs-utils rsync
 sudo mkdir -p /mnt/unraid/jobbot
 sudo nano /root/.smb-unraid          # two lines: username=YOURUSER  password=YOURPASS
 sudo chmod 600 /root/.smb-unraid
-echo '//UNRAID-IP/jobbot /mnt/unraid/jobbot cifs credentials=/root/.smb-unraid,uid=karlo,gid=karlo,iocharset=utf8,_netdev,nofail 0 0' | sudo tee -a /etc/fstab
+echo '//UNRAID-IP/jobbot /mnt/unraid/jobbot cifs credentials=/root/.smb-unraid,uid=karlo,gid=karlo,iocharset=utf8,_netdev,nofail,noserverino 0 0' | sudo tee -a /etc/fstab
 sudo mount -a && ls /mnt/unraid/jobbot
 grep -q SYNC_DIR /opt/jobbot/config.env || echo 'SYNC_DIR=/mnt/unraid/jobbot' >> /opt/jobbot/config.env
 ```
 (Replace UNRAID-IP with your server's IP or Tailscale name.)
+`noserverino` matters: Unraid user shares don't keep stable inode numbers, and without it the
+mount goes "Stale file handle" within minutes (sync and state backup then silently skip).
+Already mounted without it? Add `,noserverino` to the fstab line, then
+`sudo systemctl daemon-reload && sudo umount -l /mnt/unraid/jobbot && sudo mount /mnt/unraid/jobbot`.
 On the Mac: Finder → Go → Connect to Server → `smb://UNRAID-IP/jobbot` (tick "Remember"). Every run copies CVs, letters, .ics, prep packs and tracker.md there.
 
 ## 3. One-tap inbox updates from your iPhone (no AI)

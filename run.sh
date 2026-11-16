@@ -47,4 +47,9 @@ fi
 MSG="$(cat summary.txt 2>/dev/null || echo 'Scan finished.')"
 [ -n "$FILES" ] && MSG="$MSG
 Files in out/: $FILES"
+# Heartbeat: "Mail watch: last OK <time>" or "Mail watch NOT running since <time>" (older than 6 h)
+if [ -n "${MAIL_USER:-}" ]; then
+  MSG="$MSG
+$(python3 mailwatch.py --status 2>>"$LOG" || echo 'Mail watch: status unknown')"
+fi
 notify "$MSG"

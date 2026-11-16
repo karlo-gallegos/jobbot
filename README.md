@@ -69,6 +69,11 @@ Every 2 hours (08:07–22:07) it reads new Gmail over IMAP and looks for emails 
   ping opens the email in Gmail. Something already overdue is flagged **OVERDUE**.
   `reminders.py` pings these at 3 days / tomorrow / today too.
 - It never replies, sends, deletes or marks anything read. Optional `MAIL_LABEL` adds a Gmail label.
+- If a run fails (IMAP down, app password revoked, crash) you get a high-priority ping
+  "Jobbot mail watch failed: …" – at most one per 12 hours. The Sunday summary ends with
+  "Mail watch: last OK <time>", or "Mail watch NOT running since <time>" if it has not
+  succeeded for 6 hours (`python3 mailwatch.py --status` prints the same line).
+  Without `MAIL_USER` in `config.env` the step is off and stays quiet.
 
 Setup on head01 (once):
 1. Google Account → Security → 2-Step Verification on → **App passwords** → create one

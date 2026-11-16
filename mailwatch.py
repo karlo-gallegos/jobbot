@@ -17,8 +17,14 @@
   python3 mailwatch.py --since 14      look back 14 days this run (ignores the saved position)
   python3 mailwatch.py --dry-run       print what it would do; save / ping / label nothing
   python3 mailwatch.py --eml DIR       read DIR/*.eml instead of IMAP (tests)
+  python3 mailwatch.py --status        print "Mail watch: last OK <time>" (run.sh summary)
 
-mail_events.json = {"version": 1, "uidvalidity": int, "last_uid": int, "events": [event, ...]}
+Any error (IMAP, revoked app password, crash) pings ntfy "Jobbot mail watch failed" – at most once
+per 12 h – and is re-raised so it is in logs/mail.log. Without MAIL_USER the step is switched off.
+
+mail_events.json = {"version": 1, "uidvalidity": int, "last_uid": int, "events": [event, ...],
+                    "last_ok": "YYYY-MM-DDTHH:MM" (last successful run),
+                    "last_error_ping": "YYYY-MM-DDTHH:MM" (last failure ping)}
 event = {"uid": stable id, "msg": message id, "kind": "deadline" | "event" | "action" | "info",
          "employer", "title", "action", "due": "YYYY-MM-DD[THH:MM]" | null,
          "end": "YYYY-MM-DDTHH:MM" | null, "checked": bool (date found word-for-word in the email),
@@ -39,6 +45,8 @@ MAX_EMAILS = 15        # per model call
 MAX_BODY = 6000        # characters of each email sent to the model
 KEEP_DAYS = 30         # drop events this long after they are due / found
 KINDS = ("deadline", "event", "action", "info")
+ERROR_PING_HOURS = 12  # at most one "mail watch failed" ping this often
+STALE_HOURS = 6        # run.sh summary: older last_ok = not running
 
 # Job alerts and newsletters mention employers and "apply by" all the time – never analyse them.
 NOISE = ("linkedin.com", "indeed.com", "targetjobs.co.uk", "up2staff.com", "nijobs.com",
@@ -400,12 +408,73 @@ def ping(cfg, title, text, prio, click=None):
     notify(cfg, text, title, **extra)
 
 
+# ---------- health ----------
+def _now():
+    if os.environ.get("JOBBOT_NOW"):  # tests only
+        return datetime.datetime.fromisoformat(os.environ["JOBBOT_NOW"])
+    return datetime.datetime.now(UK).replace(tzinfo=None)
+
+
+def _stamp(t):
+    return t.strftime("%Y-%m-%dT%H:%M")
+
+
+def mark_ok(now):
+    st = load_state()
+    st["last_ok"] = _stamp(now)
+    save_state(st)
+
+
+def failure_alert(cfg, err, now):
+    """Ping "mail watch failed" unless one was sent in the last ERROR_PING_HOURS."""
+    short = re.sub(r"\s+", " ", f"{type(err).__name__}: {err}")[:200]
+    try:
+        st = load_state()
+    except (OSError, ValueError):  # unreadable state: ping, but don't overwrite the file
+        st = None
+    last = (st or {}).get("last_error_ping")
+    if last and now - datetime.datetime.fromisoformat(last) < datetime.timedelta(hours=ERROR_PING_HOURS):
+        print(f"mail watch failed ({short}); failure ping already sent at {last}", file=sys.stderr)
+        return
+    if cfg.get("NTFY_TOPIC"):
+        notify(cfg, f"Jobbot mail watch failed: {short}\nSee logs/mail.log", "Jobbot mail watch failed",
+               Priority="high", Tags="warning")
+    if st is not None:
+        st["last_error_ping"] = _stamp(now)
+        save_state(st)
+
+
+def status(now=None):
+    """One line for the run.sh summary."""
+    now = now or _now()
+    try:
+        last = load_state().get("last_ok")
+    except (OSError, ValueError):
+        last = None
+    if last and now - datetime.datetime.fromisoformat(last) <= datetime.timedelta(hours=STALE_HOURS):
+        return f"Mail watch: last OK {last.replace('T', ' ')}"
+    return f"Mail watch NOT running since {last.replace('T', ' ') if last else '(never ran OK)'}"
+
+
 # ---------- main ----------
 def run(args):
-    now = (datetime.datetime.fromisoformat(os.environ["JOBBOT_NOW"]) if os.environ.get("JOBBOT_NOW")
-           else datetime.datetime.now(UK).replace(tzinfo=None))  # JOBBOT_NOW: tests only
-    today = now.date()
+    now = _now()
     cfg = config()
+    if not args.eml and not cfg.get("MAIL_USER"):
+        print("MAIL_USER not set in config.env – mail watch is off")
+        return
+    try:
+        check_mail(args, cfg, now)
+    except BaseException as e:
+        if not args.dry_run and not isinstance(e, KeyboardInterrupt):
+            failure_alert(cfg, e, now)
+        raise
+    if not args.dry_run:
+        mark_ok(now)
+
+
+def check_mail(args, cfg, now):
+    today = now.date()
     for k in ("NTFY_TOPIC",) + (() if args.eml else ("MAIL_USER", "MAIL_APP_PASSWORD")):
         if not cfg.get(k):
             raise SystemExit(f"{k} missing in config.env")
@@ -483,7 +552,11 @@ def main(argv=None):
     ap.add_argument("--since", type=int, help="look back N days this run")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--eml", help="read DIR/*.eml instead of IMAP")
+    ap.add_argument("--status", action="store_true", help="print when the last run succeeded")
     args = ap.parse_args(argv)
+    if args.status:
+        print(status())
+        return
     with open(LOCK, "w") as lk:
         try:
             fcntl.flock(lk, fcntl.LOCK_EX | fcntl.LOCK_NB)

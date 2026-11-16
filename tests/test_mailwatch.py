@@ -196,6 +196,52 @@ class MailwatchTest(unittest.TestCase):
         alerts = self.mw.upcoming_alerts(datetime.date(2026, 11, 17), {3: "in 3 days", 1: "TOMORROW", 0: "TODAY"})
         self.assertIn((1, "Complete SONI video interview – due TOMORROW (Wed 18 Nov 23:59)"), alerts)
 
+    def test_mailbox_error_pings_once_per_12h(self):
+        class Broken:
+            def __init__(self, path):
+                raise OSError("[AUTHENTICATIONFAILED] Invalid credentials")
+        self.mw.EmlDir = Broken
+        with self.assertRaises(OSError):
+            self.mw.main(["--eml", str(self.box)])
+        self.assertEqual(len(self.pings), 1)
+        title, msg, h = self.pings[0]
+        self.assertTrue(msg.startswith("Jobbot mail watch failed: OSError: [AUTHENTICATIONFAILED]"), msg)
+        self.assertEqual(h["Priority"], "high")
+        st = json.loads((self.tmp / "mail_events.json").read_text())
+        self.assertEqual(st["last_error_ping"], NOW)
+        self.assertNotIn("last_ok", st)
+
+        os.environ["JOBBOT_NOW"] = "2026-11-10T08:59"   # 12 h later minus a minute: no second ping
+        with self.assertRaises(OSError):
+            self.mw.main(["--eml", str(self.box)])
+        self.assertEqual(len(self.pings), 1)
+        os.environ["JOBBOT_NOW"] = "2026-11-10T09:00"   # 12 h on: ping again
+        with self.assertRaises(OSError):
+            self.mw.main(["--eml", str(self.box)])
+        self.assertEqual(len(self.pings), 2)
+        import datetime
+        self.assertTrue(self.mw.status(datetime.datetime(2026, 11, 10, 9, 0)).startswith(
+            "Mail watch NOT running since (never ran OK)"))
+
+    def test_last_ok_and_status(self):
+        self.mw.main(["--eml", str(self.box)])
+        self.assertEqual(json.loads((self.tmp / "mail_events.json").read_text())["last_ok"], NOW)
+        import datetime
+        self.assertEqual(self.mw.status(datetime.datetime(2026, 11, 10, 3, 0)),
+                         "Mail watch: last OK 2026-11-09 21:00")
+        self.assertEqual(self.mw.status(datetime.datetime(2026, 11, 10, 3, 1)),
+                         "Mail watch NOT running since 2026-11-09 21:00")
+        # Dry runs record nothing.
+        os.environ["JOBBOT_NOW"] = "2026-11-10T11:00"
+        self.mw.main(["--eml", str(self.box), "--dry-run"])
+        self.assertEqual(json.loads((self.tmp / "mail_events.json").read_text())["last_ok"], NOW)
+
+    def test_off_without_mail_user(self):
+        (self.tmp / "config.env").write_text("NTFY_TOPIC=test\n")
+        self.mw.main([])   # no MAIL_USER: quietly off, no IMAP, no ping, no state
+        self.assertEqual(self.pings, [])
+        self.assertFalse((self.tmp / "mail_events.json").exists())
+
     def test_model_failure_still_pings_subjects(self):
         (self.tmp / "claude_stub.py").write_text("#!/usr/bin/env python3\nimport sys\nsys.exit(1)\n")
         self.mw.main(["--eml", str(self.box)])

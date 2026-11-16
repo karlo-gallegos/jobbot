@@ -85,6 +85,8 @@ Every 2 hours (08:07–22:07) it reads new Gmail over IMAP and looks for emails 
 Setup on head01 (once):
 1. Google Account → Security → 2-Step Verification on → **App passwords** → create one
    called "jobbot". Put `MAIL_USER` and `MAIL_APP_PASSWORD` in `config.env` (`chmod 600 config.env`).
+   Type the password **without the spaces** Google shows – the shell scripts `source` config.env.
+   Check: `bash -c 'set -eu; source /opt/jobbot/config.env' && echo ok`
 2. Dry run over the last 2 weeks: `python3 mailwatch.py --since 14 --dry-run`
 3. Real first run: `python3 mailwatch.py --since 14` (later runs carry on from where it stopped).
 4. Deploy cron: `ansible/deploy.yml`.

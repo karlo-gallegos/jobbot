@@ -48,7 +48,7 @@ echo "PASTE-THE-PHONE-PUBLIC-KEY" >> ~/.ssh/authorized_keys
 ```
 Tap the shortcut (or say "Hey Siri, Jobbot"). You get an ntfy "Noted" confirmation.
 
-## 4. Interview prep packs (Sonnet, only when you have an interview)
+## 4. Interview prep packs (Opus 5.5, only when you have an interview)
 Choosing **interview** in the shortcut (e.g. "TD Securities 20 Nov") immediately writes
 `out/Interview_Prep_<Employer>.md`: what the programme is, 8 likely questions with which of your experiences to use (STAR outlines, not scripts), technical topics to revise, questions to ask, and anything found about their assessment format. You get a ping when it's ready.
 Manual run: `/opt/jobbot/prep.sh "interview TD Securities 20 Nov"`

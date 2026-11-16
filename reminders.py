@@ -81,7 +81,7 @@ def build_pack(r, cfg, today):
         try:
             # Same call as retailor.sh, on pack_role.json instead of new_roles.json.
             subprocess.run([os.environ.get("JOBBOT_CLAUDE", "claude"), "-p", prompt,
-                            "--model", cfg.get("TAILOR_MODEL", "sonnet"), "--max-turns", "25",
+                            "--model", cfg.get("TAILOR_MODEL", "claude-opus-5-5"), "--max-turns", "25",
                             "--permission-mode", "acceptEdits",
                             "--allowedTools", "Read", "Edit", "Write", "WebFetch"],
                            cwd=ROOT, env=env, stdout=lf, stderr=subprocess.STDOUT, timeout=900, check=True)

@@ -350,7 +350,7 @@ def ask_model(cfg, items, today):
               + "\n<emails>\n" + json.dumps(payload, ensure_ascii=False, indent=1) + "\n</emails>\n")
     env = dict(os.environ, PATH=f"{pathlib.Path.home() / '.local/bin'}:{os.environ.get('PATH', '/usr/bin:/bin')}")
     cmd = [os.environ.get("JOBBOT_CLAUDE", "claude"), "-p",
-           "--model", cfg.get("MAIL_MODEL") or cfg.get("SCAN_MODEL", "haiku"),
+           "--model", cfg.get("MAIL_MODEL") or cfg.get("SCAN_MODEL", "claude-haiku-5-5"),
            "--max-turns", "2", "--tools", "", "--strict-mcp-config"]  # no tools: email text is untrusted
     res = subprocess.run(cmd, input=prompt, capture_output=True, text=True, cwd=ROOT, env=env, timeout=600)
     if res.returncode:

@@ -61,4 +61,5 @@ anything outside these five, don't do it – say so in `summary.txt`.
 - Small changes, one issue per change; reference the issue number in the commit.
 - Test against a mock role / mock watchlist in a temp dir (stub `claude` via `JOBBOT_CLAUDE`)
   before any live `claude -p` run.
-- Keep usage low: `SCAN_MODEL` (cheap) for listings, `TAILOR_MODEL` only for packs.
+- Keep usage low. Only two models: `SCAN_MODEL` = `claude-haiku-5-5` for listings and the mail step,
+  `TAILOR_MODEL` = `claude-opus-5-5` only for packs and interview prep. No Sonnet.

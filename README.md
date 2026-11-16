@@ -2,14 +2,14 @@
 
 Every Sunday at 18:31 it:
 1. applies `inbox.md` (your updates) to `watchlist.json` and regenerates `tracker.md` (plain Python; also done straight away by `inbox_add.sh` and each morning by `reminders.py`)
-2. searches gradireland, Gradcracker NI, TargetJobs/Prospects and Bright Network for new 2027 tech grad roles on the island of Ireland and re-checks existing ones (**Haiku**); `watchlist.py` merges the results into `watchlist.json` by URL and regenerates `tracker.md`
-3. writes a Profile sentence and, where required, a cover letter for up to 3 new roles (**Sonnet**)
+2. searches gradireland, Gradcracker NI, TargetJobs/Prospects and Bright Network for new 2027 tech grad roles on the island of Ireland and re-checks existing ones (**Haiku 5.5**); `watchlist.py` merges the results into `watchlist.json` by URL and regenerates `tracker.md`
+3. writes a Profile sentence and, where required, a cover letter for up to 3 new roles (**Opus 5.5**)
 4. builds tailored `.docx` CVs/letters from your own base documents (plain Python, no AI); `out/deadlines.ics` is rewritten from the whole watchlist whenever it changes
 5. sends a summary to your phone via ntfy
 
 Every morning at 08:13 `reminders.py` pings deadlines (3 days, tomorrow, today) and, for up to 2
 roles closing within 36 hours that still have no pack, runs the same tailor step as `retailor.sh`
-on just that role (via `pack_role.json`; **Sonnet**, so it uses your plan) and builds the CV/letter.
+on just that role (via `pack_role.json`; **Opus 5.5**, so it uses your plan) and builds the CV/letter.
 
 It never applies, signs in or submits. You do that, then add a line to `inbox.md`.
 
@@ -64,7 +64,7 @@ Every 2 hours (08:07–22:07) it reads new Gmail over IMAP and looks for emails 
   or applied to in `watchlist.json`, from `MAIL_EXTRA_SENDERS`, or with words like
   "interview", "assessment", "response required", "deadline", "form" in the subject.
   Most runs stop here and use nothing.
-- **Then one Haiku call** (`MAIL_MODEL`, no tools) for whatever is left, turning each email into
+- **Then one Haiku 5.5 call** (`MAIL_MODEL`, no tools) for whatever is left, turning each email into
   a deadline, event, to-do or FYI. Python checks it: dates must parse and be plausible, links
   must be copied from the email, and a date that isn't found word-for-word in the email is
   marked "(check date)". If the call fails you still get a ping listing the emails by subject.
@@ -115,7 +115,8 @@ leaves the calendar feed and the daily reminders. Matching works like the other 
 that fits several mail items is commented out so you can add a title word.
 
 ## Usage / cost
-- Scan on Haiku and tailor on Sonnet keeps usage low; change models in `config.env`.
+- Only two models: `SCAN_MODEL=claude-haiku-5-5` (scan, mail) and `TAILOR_MODEL=claude-opus-5-5`
+  (CV/cover-letter packs, interview prep). Opus runs only when a pack or prep is actually built.
 - Runs count against your Claude plan when signed in with your account. To keep it off your plan entirely, set `ANTHROPIC_API_KEY` in `config.env` (pay-per-use API billing) instead of signing in.
 - Search budget is capped in `prompts/scan.md` (20 searches + 8 fetches).
 

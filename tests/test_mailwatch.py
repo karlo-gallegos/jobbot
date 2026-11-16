@@ -82,7 +82,7 @@ class MailwatchTest(unittest.TestCase):
             shutil.copy2(REPO / f, self.tmp / f)
         shutil.copytree(REPO / "prompts", self.tmp / "prompts")
         (self.tmp / "config.env").write_text(
-            "NTFY_TOPIC=test\nSCAN_MODEL=haiku\nMAIL_USER=candidate@example.com\n"
+            "NTFY_TOPIC=test\nSCAN_MODEL=claude-haiku-5-5\nMAIL_USER=candidate@example.com\n"
             "MAIL_APP_PASSWORD=x\nMAIL_EXTRA_SENDERS=mint-people.co.uk\n")
         (self.tmp / "watchlist.json").write_text(json.dumps({"version": 1, "last_scan": None, "roles": [
             {"key": "https://kainos.example/grad", "link": "https://kainos.example/grad", "employer": "Kainos",
